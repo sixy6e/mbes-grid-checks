@@ -1,7 +1,8 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='ausseabed.mbesgridchecks',
+    name='ausseabed.mbesgc',
+    namespace_packages=['ausseabed'],
     version='0.0.1',
     url='https://github.com/ausseabed/mbes-grid-checks',
     author=(
@@ -16,8 +17,17 @@ setup(
         'Quality Assurance checks for grid data derived from Multi Beam Echo '
         'Sounder data'
     ),
+    entry_points={
+        "gui_scripts": [],
+        "console_scripts": [
+            'mbesgc = ausseabed.mbesgc.app.cli:cli',
+        ],
+    },
     packages=find_packages(),
     package_data={},
-    install_requires=[],
+    install_requires=[
+        'Click',
+        'ausseabed.qajson'
+    ],
     tests_require=['pytest'],
 )

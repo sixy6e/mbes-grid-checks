@@ -13,3 +13,9 @@ Assumes a miniconda Python distribution has been installed.
 
     pip install -r requirements.txt
     conda install -y -c conda-forge --file requirements_conda.txt
+
+# Tests
+
+Unit tests can be run with the following command line
+
+    python -m pytest -s --cov=ausseabed.mbesgc tests/
