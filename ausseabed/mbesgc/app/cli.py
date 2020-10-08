@@ -11,6 +11,8 @@ import os
 from osgeo import gdal
 
 from ausseabed.mbesgc.lib.data import get_input_details
+from ausseabed.mbesgc.lib.executor import Executor
+from ausseabed.mbesgc.lib.check_utils import get_all_check_ids
 
 
 @click.command()
@@ -32,9 +34,17 @@ def cli(
             err=True)
         sys.exit(os.EX_NOINPUT)
 
+    all_check_ids = get_all_check_ids()
     inputs = get_input_details([input_file])
     for input in inputs:
-        print(input)
+        input.check_ids = all_check_ids
+
+    exe = Executor(inputs)
+
+    def print_prog(progress):
+        click.echo(f"progress = {progress}")
+    exe.run(print_prog)
+
 
     # src_ds = gdal.Open(input_file)
     # if src_ds is None:

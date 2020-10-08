@@ -24,6 +24,9 @@ class InputFileDetails:
         self.size_y = None
         self.input_band_details = []
 
+        # list of check uuids that this input file will be run through
+        self.check_ids = []
+
     def add_band_details(
             self,
             input_file: str,
