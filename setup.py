@@ -23,7 +23,7 @@ setup(
             'mbesgc = ausseabed.mbesgc.app.cli:cli',
         ],
     },
-    packages=find_packages(),
+    packages=['ausseabed.mbesgc'],
     package_data={},
     install_requires=[
         'Click',
