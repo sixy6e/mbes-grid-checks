@@ -1,9 +1,10 @@
 '''
 Definition of Grid Checks implemented in mbesgc
 '''
+from __future__ import annotations
 from enum import Enum
 from typing import Optional, Dict, List, Any
-from ausseabed.qajson.model import QajsonParam
+from ausseabed.qajson.model import QajsonParam, QajsonOutputs
 
 import numpy as np
 
@@ -74,6 +75,24 @@ class GridCheck:
         '''
         raise NotImplementedError
 
+    def merge_results(self, last_check: GridCheck) -> None:
+        '''
+        Abstract function definition for how each check should merge results.
+
+        Checks are run on a tile by tile (chunck of input data) basis. To get
+        the complete results the results from each chunk need to be merged.
+        This merging needs to be implemented within this function.
+
+        Must be overwritten by child classes
+        '''
+        raise NotImplementedError
+
+    def get_outputs(self) -> QajsonOutputs:
+        '''
+        Gets the results of this check in a QaJson format
+        '''
+        raise NotImplementedError
+
 
 class DensityCheck(GridCheck):
     '''
@@ -109,8 +128,42 @@ class DensityCheck(GridCheck):
             uncertainty,
             progress_callback=None):
         # generate histogram of counts
+        # unique_vals will be the soundings per node
+        # unique_counts is the total number of times the unique_val soundings
+        # count was found.
         unique_vals, unique_counts = np.unique(density, return_counts=True)
 
-        print("density chunk")
-        print(unique_vals)
-        print(unique_counts)
+        hist = {}
+        for (val, count) in zip(unique_vals, unique_counts):
+            hist[val] = count
+
+        self.density_histogram = hist
+
+    def merge_results(self, last_check: GridCheck):
+        # merge the density histogram of the last_check into the current
+        # check
+        for soundings_count, last_count in last_check.density_histogram.items():
+            if soundings_count in self.density_histogram:
+                self.density_histogram[soundings_count] += last_count
+            else:
+                self.density_histogram[soundings_count] = last_count
+
+    def get_outputs(self):
+        # TODO
+        # TODO
+        # TODO
+        messages = []
+        data = {}
+        check_state = None
+
+        result = QajsonOutputs(
+            execution=None,
+            files=None,
+            count=None,
+            percentage=None,
+            messages=messages,
+            data=data,
+            check_state=check_state
+        )
+
+        return outputs

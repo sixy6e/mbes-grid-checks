@@ -19,6 +19,10 @@ class Executor:
         self.tile_size_y = 2000
         self.checks = all_checks
 
+        # used to store the results of each check as the checks are run
+        # across multiple tiles
+        self.check_result_cache = {}
+
     def _load_band_tile(self, filename: str, band_index: int, tile: Tile):
         src_ds = gdal.Open(filename)
         if src_ds is None:
@@ -34,6 +38,9 @@ class Executor:
         return band_data
 
     def _load_data(self, ifd: InputFileDetails, tile: Tile):
+        '''
+        Loads the 3 input bands for the given tile
+        '''
         depth_file, depth_band_idx = ifd.get_band(BandType.depth)
         density_file, density_band_idx = ifd.get_band(BandType.density)
         uncertainty_file, uncertainty_band_idx = ifd.get_band(
@@ -64,6 +71,15 @@ class Executor:
 
             check.run(depth_data, density_data, uncertainty_data)
 
+            # if this check has already been run on a different tile we need
+            # to merge the results together. Then when all tiles have been run
+            # we'll have a single entry for each check in `check_result_cache`
+            # that is the result of all tiles merged
+            if check_id in self.check_result_cache:
+                last_check = self.check_result_cache
+                check.merge_results(last_check)
+            self.check_result_cache[check_id] = check
+
     def __update_progress(self, progress_callback, progress):
         if progress_callback is None:
             return
@@ -71,6 +87,8 @@ class Executor:
             progress_callback(progress)
 
     def run(self, progress_callback=None):
+        # clear out any previously run checks
+        self.check_result_cache = {}
 
         # collect list of input files, and the list of tiles to be used for
         # each of these input files
@@ -94,7 +112,12 @@ class Executor:
 
         processed_tile_count = 0
         self.__update_progress(progress_callback, 0)
+        # loop over each input file
         for (ifd, tiles) in files_and_tiles:
+            # and for each input file loop over the necessary tiles
+            # It's much more performant do only load the data for each tile
+            # once, and then run all the checks over the loaded tile
+            # before moving onto the next
             for tile in tiles:
                 depth_data, density_data, uncertainty_data = self._load_data(
                     ifd,
