@@ -1,0 +1,50 @@
+{
+    "qa": {
+        "version": "0.1.4",
+        "raw_data": {
+            "checks": []
+        },
+        "survey_products": {
+            "checks": [
+                {
+                    "info": {
+                        "id": "5e2afd8a-2ced-4de8-80f5-111c459a7175",
+                        "name": "Density",
+                        "description": "",
+                        "version": "1",
+                        "group": {
+                            "id": "123",
+                            "name": "123"
+                        }
+                    },
+                    "inputs": {
+                        "files": [
+                            {
+                                "path": "in2018_c01_CombinedSurface_CUBE_2m_Rev2.tiff",
+                                "description": "processed data",
+                                "file_type": "Grid Files"
+                            }
+                        ],
+                        "params": [
+                            {
+                                "name": "min_soundings_per_node",
+                                "value": 9
+                            },
+                            {
+                                "name": "min_soundings_per_node_at_percentage",
+                                "value": 5
+                            },
+                            {
+                                "name": "min_soundings_per_node_percentage",
+                                "value": 95
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        "chart_adequacy": {
+            "checks": []
+        }
+    }
+}
