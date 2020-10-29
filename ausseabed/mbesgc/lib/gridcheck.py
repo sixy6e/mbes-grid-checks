@@ -2,11 +2,14 @@
 Definition of Grid Checks implemented in mbesgc
 '''
 from __future__ import annotations
+from datetime import datetime
 from enum import Enum
 from typing import Optional, Dict, List, Any
-from ausseabed.qajson.model import QajsonParam, QajsonOutputs
+from ausseabed.qajson.model import QajsonParam, QajsonOutputs, QajsonExecution
 
+import collections
 import numpy as np
+import numpy.ma as ma
 
 
 class GridCheckState(str, Enum):
@@ -34,6 +37,33 @@ class GridCheck:
 
     def __init__(self, input_params: List[QajsonParam]):
         self.input_params = input_params
+
+        # used to record time check was started, and when it completed
+        self.start_time = None
+        self.end_time = None
+
+        # did the check execute successfully
+        self.execution_status = 'draft'
+        # any error messages that occured during running of the check
+        self.error_message = None
+
+    def check_started(self):
+        '''
+        to be called before first call to checkc `run` function. Initialises
+        the check
+        '''
+        if self.start_time is None:
+            # only set the start time if the start_time is None, as this
+            # function may be called multiple times as each tile is processed
+            self.start_time = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
+        self.execution_status = 'running'
+
+    def check_ended(self):
+        '''
+        to be called after last call to check `run` function. Finalises
+        the check
+        '''
+        self.end_time = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
 
     def get_param(self, param_name: str) -> Any:
         ''' Gets the parameter value from the list of QajsonParams. Returns
@@ -123,6 +153,7 @@ class DensityCheck(GridCheck):
             'min_soundings_per_node_at_percentage')
 
     def run(
+            self,
             depth,
             density,
             uncertainty,
@@ -132,32 +163,95 @@ class DensityCheck(GridCheck):
         # unique_counts is the total number of times the unique_val soundings
         # count was found.
         unique_vals, unique_counts = np.unique(density, return_counts=True)
-
         hist = {}
         for (val, count) in zip(unique_vals, unique_counts):
-            hist[val] = count
+            if type(val) is ma.core.MaskedConstant:
+                continue
+            # following gets serialized to JSON and as numpy types are not
+            # supported by default we convert the float32 and int64 types to
+            # plain python ints
+            hist[int(val)] = int(count)
 
         self.density_histogram = hist
 
     def merge_results(self, last_check: GridCheck):
-        # merge the density histogram of the last_check into the current
-        # check
+        '''
+        merge the density histogram of the last_check into the current check
+        '''
+        self.start_time = last_check.start_time
+
         for soundings_count, last_count in last_check.density_histogram.items():
             if soundings_count in self.density_histogram:
                 self.density_histogram[soundings_count] += last_count
             else:
                 self.density_histogram[soundings_count] = last_count
 
-    def get_outputs(self):
-        # TODO
-        # TODO
-        # TODO
+    def get_outputs(self) -> QajsonOutputs:
+
+        execution = QajsonExecution(
+            start=self.start_time,
+            end=self.end_time,
+            status=self.execution_status,
+            error=self.error_message
+        )
+
+        if len(self.density_histogram) == 0:
+            # there's no data to check, so fail
+            return QajsonOutputs(
+                execution=execution,
+                files=None,
+                count=None,
+                percentage=None,
+                messages=[
+                    'No counts were extracted, was a valid raster provided'],
+                data=None,
+                check_state=GridCheckState.cs_fail
+            )
+
+        # sort the list of sounding counts and the number of occurances
+        counts = collections.OrderedDict(
+            sorted(self.density_histogram.items()))
+
         messages = []
         data = {}
         check_state = None
 
+        lowest_sounding_count, occurances = next(iter(counts.items()))
+        if lowest_sounding_count < self._min_spn:
+            messages.append(
+                f'Minimum sounding count of {lowest_sounding_count} occured '
+                f'{occurances} times'
+            )
+            check_state = GridCheckState.cs_fail
+
+        total_soundings = sum(counts.values())
+        under_threshold_soundings = 0
+        for sounding_count, occurances in counts.items():
+            if sounding_count >= self._min_spn_ap:
+                break
+            under_threshold_soundings += occurances
+
+        percentage_over_threshold = \
+            (1.0 - under_threshold_soundings / total_soundings) * 100.0
+
+        if percentage_over_threshold < self._min_spn_p:
+            messages.append(
+                f'{percentage_over_threshold}% of nodes were found to have a '
+                f'sounding count below {self._min_spn_ap}. This is required to'
+                f' be {self._min_spn_p}% of all nodes'
+            )
+            check_state = GridCheckState.cs_fail
+
+        if check_state is None:
+            check_state = GridCheckState.cs_pass
+
+        data['chart'] = {
+            'type': 'histogram',
+            'data': counts
+        }
+
         result = QajsonOutputs(
-            execution=None,
+            execution=execution,
             files=None,
             count=None,
             percentage=None,
@@ -166,4 +260,4 @@ class DensityCheck(GridCheck):
             check_state=check_state
         )
 
-        return outputs
+        return result

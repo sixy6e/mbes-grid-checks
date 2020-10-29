@@ -5,6 +5,7 @@ Manages process of executing checks
 from typing import Optional, Dict, List, Any
 from osgeo import gdal
 import numpy as np
+import numpy.ma as ma
 
 from .check_utils import all_checks, get_check
 from .data import InputFileDetails, BandType
@@ -35,7 +36,15 @@ class Executor:
             tile.max_x - tile.min_x,
             tile.max_y - tile.min_y
         ))
-        return band_data
+
+        # we need to mask the nodata values otherwise whatever value is used
+        # for nodata will appear in the results
+        nodata = src_band.GetNoDataValue()
+        if nodata is None:
+            return band_data
+        else:
+            masked_band_data = ma.masked_where(band_data == nodata, band_data)
+            return masked_band_data
 
     def _load_data(self, ifd: InputFileDetails, tile: Tile):
         '''
@@ -65,18 +74,20 @@ class Executor:
         Runs each of the checks assigned to each file (via the
         InputFileDetails) on the loaded data arrays
         '''
-        for check_id in ifd.check_ids:
+        for check_id, check_params in ifd.check_ids_and_params:
             check_class = get_check(check_id)
-            check = check_class([])
+            check = check_class(check_params)
 
+            check.check_started()
             check.run(depth_data, density_data, uncertainty_data)
+            check.check_ended()
 
             # if this check has already been run on a different tile we need
             # to merge the results together. Then when all tiles have been run
             # we'll have a single entry for each check in `check_result_cache`
             # that is the result of all tiles merged
             if check_id in self.check_result_cache:
-                last_check = self.check_result_cache
+                last_check = self.check_result_cache[check_id]
                 check.merge_results(last_check)
             self.check_result_cache[check_id] = check
 
@@ -118,7 +129,7 @@ class Executor:
             # It's much more performant do only load the data for each tile
             # once, and then run all the checks over the loaded tile
             # before moving onto the next
-            for tile in tiles:
+            for tile_idx, tile in enumerate(tiles):
                 depth_data, density_data, uncertainty_data = self._load_data(
                     ifd,
                     tile
@@ -135,3 +146,8 @@ class Executor:
                     progress_callback,
                     processed_tile_count/total_tile_count
                 )
+
+                if tile_idx > 8:
+                    for key, value in self.check_result_cache.items():
+                        print(value.density_histogram)
+                    return

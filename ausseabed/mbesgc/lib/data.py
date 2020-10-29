@@ -6,7 +6,7 @@ to what they represent
 
 from enum import Enum
 from osgeo import gdal
-from typing import Tuple
+from typing import Tuple, List
 import os
 import os.path
 
@@ -25,7 +25,7 @@ class InputFileDetails:
         self.input_band_details = []
 
         # list of check uuids that this input file will be run through
-        self.check_ids = []
+        self.check_ids_and_params = []
 
     def add_band_details(
             self,
@@ -60,6 +60,10 @@ def _get_tiff_details(input_file):
     Single tiffs include all 3 bands
     '''
     raster = gdal.Open(input_file)
+    if raster is None:
+        raise RuntimeError(
+            f'input file {input_file} could not be opened'
+        )
     size_x = raster.RasterXSize
     size_y = raster.RasterYSize
 
@@ -76,12 +80,12 @@ def _get_tiff_details(input_file):
     ifd.add_band_details(
         input_file,
         1,
-        BandType.depth
+        BandType.density
     )
     ifd.add_band_details(
         input_file,
         2,
-        BandType.density
+        BandType.depth
     )
     ifd.add_band_details(
         input_file,
@@ -151,13 +155,19 @@ def _get_bag_details(input_file):
     return ifd
 
 
-def get_input_details(inputfiles):
+def get_input_details(
+        inputfiles: List[str],
+        relative_to: str = None) -> List[str]:
     '''
     Extracts relevant band numbers, size(px), and appropriate file names
     from list of input files.
     '''
     inputdetails = []
     for inputfile in inputfiles:
+        if not os.path.isfile(inputfile) and relative_to is not None:
+            test_rel_file = os.path.join(relative_to, inputfile)
+            if os.path.isfile(test_rel_file):
+                inputfile = test_rel_file
         if (inputfile.lower().endswith('.tif')
                 or inputfile.lower().endswith('.tiff')):
             tifdetails = _get_tiff_details(inputfile)
