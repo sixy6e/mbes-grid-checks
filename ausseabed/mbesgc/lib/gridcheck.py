@@ -177,15 +177,6 @@ class DensityCheck(GridCheck):
             # plain python ints
             hist[int(val)] = int(count)
 
-        print()
-        print()
-        print("hist")
-        print(hist)
-        print()
-        print()
-        print()
-        print()
-
         self.density_histogram = hist
 
     def merge_results(self, last_check: GridCheck):
