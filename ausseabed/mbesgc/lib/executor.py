@@ -16,13 +16,15 @@ class Executor:
 
     def __init__(self, input_file_details: List[InputFileDetails]):
         self.input_file_details = input_file_details
-        self.tile_size_x = 2000
-        self.tile_size_y = 2000
+        self.tile_size_x = 30000
+        self.tile_size_y = 30000
         self.checks = all_checks
 
         # used to store the results of each check as the checks are run
         # across multiple tiles
         self.check_result_cache = {}
+
+        self.stopped = False
 
     def _load_band_tile(self, filename: str, band_index: int, tile: Tile):
         src_ds = gdal.Open(filename)
@@ -62,6 +64,14 @@ class Executor:
         uncertainty_data = self._load_band_tile(
             uncertainty_file, uncertainty_band_idx, tile)
 
+        print(density_data)
+        density_data = density_data.astype(int)
+        print(density_data)
+        occurrences = np.count_nonzero(density_data == 1)
+        print(f'ones = {occurrences}')
+        print()
+        print()
+
         return (depth_data, density_data, uncertainty_data)
 
     def _run_checks(
@@ -75,6 +85,9 @@ class Executor:
         InputFileDetails) on the loaded data arrays
         '''
         for check_id, check_params in ifd.check_ids_and_params:
+            if self.stopped:
+                return
+
             check_class = get_check(check_id)
             check = check_class(check_params)
 
@@ -86,10 +99,10 @@ class Executor:
             # to merge the results together. Then when all tiles have been run
             # we'll have a single entry for each check in `check_result_cache`
             # that is the result of all tiles merged
-            if check_id in self.check_result_cache:
-                last_check = self.check_result_cache[check_id]
+            if (ifd, check_id) in self.check_result_cache:
+                last_check = self.check_result_cache[(ifd, check_id)]
                 check.merge_results(last_check)
-            self.check_result_cache[check_id] = check
+            self.check_result_cache[(ifd, check_id)] = check
 
     def __update_progress(self, progress_callback, progress):
         if progress_callback is None:
@@ -100,6 +113,8 @@ class Executor:
     def run(self, progress_callback=None):
         # clear out any previously run checks
         self.check_result_cache = {}
+
+        self.stopped = False
 
         # collect list of input files, and the list of tiles to be used for
         # each of these input files
@@ -130,6 +145,9 @@ class Executor:
             # once, and then run all the checks over the loaded tile
             # before moving onto the next
             for tile_idx, tile in enumerate(tiles):
+                if self.stopped:
+                    return
+
                 depth_data, density_data, uncertainty_data = self._load_data(
                     ifd,
                     tile
@@ -147,7 +165,14 @@ class Executor:
                     processed_tile_count/total_tile_count
                 )
 
-                if tile_idx > 8:
-                    for key, value in self.check_result_cache.items():
-                        print(value.density_histogram)
-                    return
+                # if tile_idx > 8:
+                #     continue
+                    # for key, value in self.check_result_cache.items():
+                    #     print(value.density_histogram)
+                    # return
+
+    def stop(self):
+        '''
+        Stops the executor from running more checks
+        '''
+        self.stopped = True

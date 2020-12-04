@@ -10,6 +10,8 @@ from typing import Tuple, List
 import os
 import os.path
 
+from ausseabed.qajson.model import QajsonCheck
+
 
 class BandType(str, Enum):
     depth = 'depth'
@@ -26,6 +28,10 @@ class InputFileDetails:
 
         # list of check uuids that this input file will be run through
         self.check_ids_and_params = []
+
+        # keep track of the qajson check entry so that results can be written
+        # to it.
+        self.qajson_check = None
 
     def add_band_details(
             self,
@@ -156,6 +162,7 @@ def _get_bag_details(input_file):
 
 
 def get_input_details(
+        qajson_check: QajsonCheck,
         inputfiles: List[str],
         relative_to: str = None) -> List[str]:
     '''
@@ -182,4 +189,30 @@ def get_input_details(
             # ignore all other files passed in
             continue
 
+    # maintain reference to the qajson entity this lot of input files was
+    # generated from so we can update the qajson after check is complete.
+    for inputdetail in inputdetails:
+        inputdetail.qajson_check = qajson_check
+
     return inputdetails
+
+
+def inputs_from_qajson_checks(
+        qajson_checks: List[QajsonCheck],
+        relative_to: str = None):
+
+    inputs = []
+    for qajson_check in qajson_checks:
+        check_id = qajson_check.info.id
+        filenames = [
+            qajson_file.path
+            for qajson_file in qajson_check.inputs.files
+        ]
+
+        check_inputs = get_input_details(qajson_check, filenames, relative_to)
+        for ci in check_inputs:
+            cid_and_params = (check_id, qajson_check.inputs.params)
+            ci.check_ids_and_params.append(cid_and_params)
+            print(ci)
+        inputs.extend(check_inputs)
+    return inputs

@@ -12,7 +12,8 @@ import os
 from osgeo import gdal
 from typing import Optional, Dict, List, Any
 
-from ausseabed.mbesgc.lib.data import get_input_details
+from ausseabed.mbesgc.lib.data import get_input_details, \
+    inputs_from_qajson_checks
 from ausseabed.mbesgc.lib.executor import Executor
 from ausseabed.mbesgc.lib.check_utils import get_all_check_ids
 from ausseabed.qajson.parser import QajsonParser
@@ -27,22 +28,7 @@ def inputs_from_qajson(check_dicts: List, relative_to: str = None):
         for check_dict in check_dicts
     ]
 
-    inputs = []
-    for qajson_check in qajson_checks:
-        check_id = qajson_check.info.id
-        filenames = [
-            qajson_file.path
-            for qajson_file in qajson_check.inputs.files
-        ]
-
-        check_inputs = get_input_details(filenames, relative_to)
-        for ci in check_inputs:
-            cid_and_params = (check_id, qajson_check.inputs.params)
-            ci.check_ids_and_params.append(cid_and_params)
-            print(ci)
-        inputs.extend(check_inputs)
-    return inputs
-
+    return inputs_from_qajson_checks(qajson_checks)
 
 
 @click.command()

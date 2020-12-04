@@ -4,7 +4,8 @@ from .gridcheck import *
 
 
 all_checks = [
-    DensityCheck
+    DensityCheck,
+    TvuCheck
 ]
 
 
