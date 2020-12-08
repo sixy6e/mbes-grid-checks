@@ -24,6 +24,7 @@ setup(
         ],
     },
     packages=['ausseabed.mbesgc'],
+    zip_safe=False,
     package_data={},
     install_requires=[
         'Click',
