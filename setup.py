@@ -23,7 +23,9 @@ setup(
             'mbesgc = ausseabed.mbesgc.app.cli:cli',
         ],
     },
-    packages=['ausseabed.mbesgc'],
+    packages=find_packages(
+        exclude=["*.tests", "*.tests.*", "tests.*", "tests", "*.test*", ]
+    ),
     zip_safe=False,
     package_data={},
     install_requires=[
