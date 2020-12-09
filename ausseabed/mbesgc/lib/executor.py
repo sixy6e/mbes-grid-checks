@@ -16,8 +16,8 @@ class Executor:
 
     def __init__(self, input_file_details: List[InputFileDetails]):
         self.input_file_details = input_file_details
-        self.tile_size_x = 30000
-        self.tile_size_y = 30000
+        self.tile_size_x = 2000
+        self.tile_size_y = 2000
         self.checks = all_checks
 
         # used to store the results of each check as the checks are run
