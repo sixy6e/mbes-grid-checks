@@ -23,7 +23,12 @@ setup(
             'mbesgc = ausseabed.mbesgc.app.cli:cli',
         ],
     },
-    packages=['ausseabed.mbesgc', 'ausseabed.mbesgc.qax'],
+    packages=[
+        'ausseabed.mbesgc',
+        'ausseabed.mbesgc.app',
+        'ausseabed.mbesgc.lib',
+        'ausseabed.mbesgc.qax'
+    ],
     zip_safe=False,
     package_data={},
     install_requires=[
