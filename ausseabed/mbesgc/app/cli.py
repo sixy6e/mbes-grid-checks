@@ -28,7 +28,7 @@ def inputs_from_qajson(check_dicts: List, relative_to: str = None):
         for check_dict in check_dicts
     ]
 
-    return inputs_from_qajson_checks(qajson_checks)
+    return inputs_from_qajson_checks(qajson_checks, relative_to)
 
 
 @click.command()
