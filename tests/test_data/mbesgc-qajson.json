@@ -20,22 +20,22 @@
                     "inputs": {
                         "files": [
                             {
-                                "path": "in2018_c01_CombinedSurface_CUBE_2m_Rev2.tiff",
+                                "path": "in2018_c01_CombinedSurface_CUBE_2m_Rev2_small.tiff",
                                 "description": "processed data",
                                 "file_type": "Grid Files"
                             }
                         ],
                         "params": [
                             {
-                                "name": "min_soundings_per_node",
-                                "value": 9
-                            },
-                            {
-                                "name": "min_soundings_per_node_at_percentage",
+                                "name": "Minimum Soundings per node",
                                 "value": 5
                             },
                             {
-                                "name": "min_soundings_per_node_percentage",
+                                "name": "Minimum Soundings per node at percentage",
+                                "value": 5
+                            },
+                            {
+                                "name": "Minumum Soundings per node percentage",
                                 "value": 95
                             }
                         ]
