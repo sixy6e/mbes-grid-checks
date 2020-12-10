@@ -24,6 +24,12 @@ class InputFileDetails:
     def __init__(self):
         self.size_x = None
         self.size_y = None
+
+        # geotransform of the raster data file. This is needed to georeference
+        # the output data arrays later
+        self.geotransform = None
+        self.projection = None
+
         self.input_band_details = []
 
         # list of check uuids that this input file will be run through
@@ -72,6 +78,8 @@ def _get_tiff_details(input_file):
         )
     size_x = raster.RasterXSize
     size_y = raster.RasterYSize
+    geotransform = raster.GetGeoTransform()
+    projection = raster.GetProjection()
 
     if raster.RasterCount != 3:
         raise RuntimeError(
@@ -82,6 +90,8 @@ def _get_tiff_details(input_file):
     ifd = InputFileDetails()
     ifd.size_x = size_x
     ifd.size_y = size_y
+    ifd.geotransform = geotransform
+    ifd.projection = projection
     # band order is assumed based on convention
     ifd.add_band_details(
         input_file,

@@ -6,10 +6,13 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional, Dict, List, Any
 from ausseabed.qajson.model import QajsonParam, QajsonOutputs, QajsonExecution
+from .data import InputFileDetails
+from .tiling import Tile
 
 import collections
 import numpy as np
 import numpy.ma as ma
+from geojson import MultiPolygon
 
 
 class GridCheckState(str, Enum):
@@ -87,6 +90,8 @@ class GridCheck:
             return param.value
 
     def run(
+            ifd: InputFileDetails,
+            tile: Tile,
             depth,
             density,
             uncertainty,
@@ -96,8 +101,12 @@ class GridCheck:
         run method.
 
         Args:
+            ifd (InputFileDetails): details of the file the data has been
+                loaded from
+            tile (Tile): pixel coordinates of the data loaded into the input
+                arrays (depth, density, uncertainty)
             depth (numpy): Depth/elevation data
-            depth (numpy): Density data
+            density (numpy): Density data
             uncertainty (numpy): Uncertainty data
             progress_callback (function): optional callback function to
                 indicate progress to caller
@@ -157,8 +166,12 @@ class DensityCheck(GridCheck):
         self._min_spn_ap = self.get_param(
             'Minimum Soundings per node at percentage')
 
+        self.tiles_geojson = MultiPolygon()
+
     def run(
             self,
+            ifd: InputFileDetails,
+            tile: Tile,
             depth,
             density,
             uncertainty,
@@ -179,6 +192,9 @@ class DensityCheck(GridCheck):
 
         self.density_histogram = hist
 
+        tile_geojson = tile.to_geojson(ifd.projection, ifd.geotransform)
+        self.tiles_geojson.coordinates.append(tile_geojson.coordinates)
+
     def merge_results(self, last_check: GridCheck):
         '''
         merge the density histogram of the last_check into the current check
@@ -190,6 +206,10 @@ class DensityCheck(GridCheck):
                 self.density_histogram[soundings_count] += last_count
             else:
                 self.density_histogram[soundings_count] = last_count
+
+        self.tiles_geojson.coordinates.extend(
+            last_check.tiles_geojson.coordinates
+        )
 
     def get_outputs(self) -> QajsonOutputs:
 
@@ -259,6 +279,8 @@ class DensityCheck(GridCheck):
             'data': str_key_counts
         }
 
+        data['map'] = self.tiles_geojson
+
         result = QajsonOutputs(
             execution=execution,
             files=None,
@@ -300,6 +322,8 @@ class TvuCheck(GridCheck):
 
     def run(
             self,
+            ifd: InputFileDetails,
+            tile: Tile,
             depth,
             density,
             uncertainty,

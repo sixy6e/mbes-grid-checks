@@ -77,6 +77,7 @@ class Executor:
     def _run_checks(
             self,
             ifd: InputFileDetails,
+            tile: Tile,
             depth_data,
             density_data,
             uncertainty_data):
@@ -92,7 +93,13 @@ class Executor:
             check = check_class(check_params)
 
             check.check_started()
-            check.run(depth_data, density_data, uncertainty_data)
+            check.run(
+                ifd,
+                tile,
+                depth_data,
+                density_data,
+                uncertainty_data
+            )
             check.check_ended()
 
             # if this check has already been run on a different tile we need
@@ -155,6 +162,7 @@ class Executor:
 
                 self._run_checks(
                     ifd,
+                    tile,
                     depth_data,
                     density_data,
                     uncertainty_data
@@ -164,12 +172,6 @@ class Executor:
                     progress_callback,
                     processed_tile_count/total_tile_count
                 )
-
-                # if tile_idx > 8:
-                #     continue
-                    # for key, value in self.check_result_cache.items():
-                    #     print(value.density_histogram)
-                    # return
 
     def stop(self):
         '''

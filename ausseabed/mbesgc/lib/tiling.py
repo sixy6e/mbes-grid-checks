@@ -1,3 +1,8 @@
+from affine import Affine
+from geojson import Polygon
+from osgeo import osr
+
+
 class Tile:
 
     def __init__(self, min_x, min_y, max_x, max_y):
@@ -5,6 +10,35 @@ class Tile:
         self.min_y = min_y
         self.max_x = max_x
         self.max_y = max_y
+
+    def to_geojson(self, projection, geotransform):
+        fwd = Affine.from_gdal(*geotransform)
+
+        min_x_min_y = fwd * (self.min_x, self.min_y)
+        max_x_min_y = fwd * (self.max_x, self.min_y)
+        max_x_max_y = fwd * (self.max_x, self.max_y)
+        min_x_max_y = fwd * (self.min_x, self.max_y)
+
+        coordinates = [
+            min_x_min_y,
+            max_x_min_y,
+            max_x_max_y,
+            min_x_max_y,
+            min_x_min_y
+        ]
+
+        src_proj = osr.SpatialReference()
+        src_proj.ImportFromWkt(projection)
+        dst_proj = osr.SpatialReference()
+        dst_proj.ImportFromEPSG(4326)
+        coord_trans = osr.CoordinateTransformation(src_proj, dst_proj)
+
+        coordinates = [
+            coord_trans.TransformPoint(coord[0], coord[1], 0.0)[:2]
+            for coord in coordinates
+        ]
+
+        return Polygon(coordinates=coordinates)
 
     def __repr__(self):
         return f"({self.min_x}, {self.min_y}) ({self.max_x}, {self.max_y})"
