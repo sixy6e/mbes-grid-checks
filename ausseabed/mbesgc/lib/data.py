@@ -223,6 +223,5 @@ def inputs_from_qajson_checks(
         for ci in check_inputs:
             cid_and_params = (check_id, qajson_check.inputs.params)
             ci.check_ids_and_params.append(cid_and_params)
-            print(ci)
         inputs.extend(check_inputs)
     return inputs
