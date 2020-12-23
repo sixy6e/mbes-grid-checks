@@ -64,13 +64,8 @@ class Executor:
         uncertainty_data = self._load_band_tile(
             uncertainty_file, uncertainty_band_idx, tile)
 
-        print(density_data)
         density_data = density_data.astype(int)
-        print(density_data)
         occurrences = np.count_nonzero(density_data == 1)
-        print(f'ones = {occurrences}')
-        print()
-        print()
 
         return (depth_data, density_data, uncertainty_data)
 
