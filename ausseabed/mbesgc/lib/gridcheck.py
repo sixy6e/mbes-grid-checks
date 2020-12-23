@@ -12,7 +12,10 @@ from .tiling import Tile
 import collections
 import numpy as np
 import numpy.ma as ma
+import geojson
 from geojson import MultiPolygon
+from osgeo import gdal, ogr, osr
+from affine import Affine
 
 
 class GridCheckState(str, Enum):
@@ -192,8 +195,81 @@ class DensityCheck(GridCheck):
 
         self.density_histogram = hist
 
-        tile_geojson = tile.to_geojson(ifd.projection, ifd.geotransform)
-        self.tiles_geojson.coordinates.append(tile_geojson.coordinates)
+        bad_cells_mask = density < self._min_spn
+        bad_cells_mask.fill_value = False
+        bad_cells_mask = bad_cells_mask.filled()
+        bad_cells_mask_int16 = bad_cells_mask.astype(np.int16)
+
+        src_affine = Affine.from_gdal(*ifd.geotransform)
+        tile_affine = src_affine * Affine.translation(
+            tile.min_x,
+            tile.min_y
+        )
+        tile_ds = gdal.GetDriverByName('MEM').Create(
+            '',
+            tile.max_x - tile.min_x,
+            tile.max_y - tile.min_y,
+            1,
+            gdal.GDT_Int16
+        )
+        tf = '/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/t.tif'
+        # tile_ds = gdal.GetDriverByName('GTiff').Create(
+        #     tf,
+        #     tile.max_x - tile.min_x,
+        #     tile.max_y - tile.min_y,
+        #     1,
+        #     gdal.GDT_Int16
+        # )
+        tile_ds.SetGeoTransform(tile_affine.to_gdal())
+
+        tile_band = tile_ds.GetRasterBand(1)
+        tile_band.WriteArray(bad_cells_mask_int16, 0, 0)
+        tile_band.SetNoDataValue(0)
+        tile_band.FlushCache()
+        tile_ds.SetProjection(ifd.projection)
+
+
+        # dst_layername = "POLYGONIZED_STUFF"
+        # drv = ogr.GetDriverByName("ESRI Shapefile")
+        # dst_ds = drv.CreateDataSource(tf + ".shp")
+        # dst_layer = dst_ds.CreateLayer(dst_layername, srs = None )
+        ogr_srs = osr.SpatialReference()
+        ogr_srs.ImportFromWkt(ifd.projection)
+
+        ogr_driver = ogr.GetDriverByName('Memory')
+        ogr_dataset = ogr_driver.CreateDataSource('shapemask')
+        ogr_layer = ogr_dataset.CreateLayer('shapemask', srs=ogr_srs)
+
+        # used the input raster data 'tile_band' as the input and mask, if not
+        # used as a mask then a feature that outlines the entire dataset is
+        # also produced
+        gdal.Polygonize(
+            tile_band,
+            tile_band,
+            ogr_layer,
+            -1,
+            [],
+            callback=None
+        )
+
+        ogr_srs_out = osr.SpatialReference()
+        ogr_srs_out.ImportFromEPSG(4326)
+        transform = osr.CoordinateTransformation(ogr_srs, ogr_srs_out)
+
+        for feature in ogr_layer:
+            transformed = feature.GetGeometryRef()
+            transformed.Transform(transform)
+
+            geojson_feature = geojson.loads(feature.ExportToJson())
+            self.tiles_geojson.coordinates.extend(
+                geojson_feature.geometry.coordinates
+            )
+
+        ogr_dataset.Destroy()
+
+        # # includes only the tile boundaries, used for debug
+        # tile_geojson = tile.to_geojson(ifd.projection, ifd.geotransform)
+        # self.tiles_geojson.coordinates.append(tile_geojson.coordinates)
 
     def merge_results(self, last_check: GridCheck):
         '''
