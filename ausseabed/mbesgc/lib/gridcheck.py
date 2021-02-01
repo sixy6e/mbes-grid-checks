@@ -382,8 +382,8 @@ class TvuCheck(GridCheck):
     name = 'Total Vertical Uncertainty Check'
     version = '1'
     input_params = [
-        QajsonParam("Constant Depth Error", 1.0),
-        QajsonParam("Factor of Depth Dependent Errors", 1.0)
+        QajsonParam("Constant Depth Error", 0.2),
+        QajsonParam("Factor of Depth Dependent Errors", 0.007)
     ]
 
     def __init__(self, input_params: List[QajsonParam]):
@@ -396,6 +396,9 @@ class TvuCheck(GridCheck):
     def merge_results(self, last_check: GridCheck):
         self.start_time = last_check.start_time
 
+        self.total_cell_count += last_check.total_cell_count
+        self.failed_cell_count += last_check.failed_cell_count
+
     def run(
             self,
             ifd: InputFileDetails,
@@ -404,8 +407,67 @@ class TvuCheck(GridCheck):
             density,
             uncertainty,
             progress_callback=None):
-        # not implemented yet
-        pass
+        # run check on tile data
+        a = self._depth_error
+        b = self._depth_error_factor
+
+        # calculate allowable uncertainty based on equation and depth data
+        allowable_uncertainty = np.sqrt(a**2 + (b * depth)**2)
+
+        failed_uncertainty = uncertainty > allowable_uncertainty
+
+        # count of all cells/nodes/pixels that are not NaN in the uncertainty
+        # array
+        self.total_cell_count = int(uncertainty.count())
+
+        # count of cells that failed the check
+        self.failed_cell_count = int(failed_uncertainty.sum())
+        # fraction_failed = failed_cell_count / total_cell_count
+        # print(f"total = {total_cell_count}")
+        # print(f"failed_cell_count = {failed_cell_count}")
+        # print(f"fraction_failed = {fraction_failed}")
+
+        failed_uncertainty.fill_value = False
+        failed_uncertainty = failed_uncertainty.filled()
+        failed_uncertainty_int16 = failed_uncertainty.astype(np.int16)
+
+        # src_affine = Affine.from_gdal(*ifd.geotransform)
+        # tile_affine = src_affine * Affine.translation(
+        #     tile.min_x,
+        #     tile.min_y
+        # )
+        # tf = '/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/au2.tif'
+        # tile_ds = gdal.GetDriverByName('GTiff').Create(
+        #     tf,
+        #     tile.max_x - tile.min_x,
+        #     tile.max_y - tile.min_y,
+        #     1,
+        #     gdal.GDT_Float32
+        # )
+        # tile_ds.SetGeoTransform(tile_affine.to_gdal())
+        #
+        # tile_band = tile_ds.GetRasterBand(1)
+        # tile_band.WriteArray(allowable_uncertainty, 0, 0)
+        # tile_band.SetNoDataValue(0)
+        # tile_band.FlushCache()
+        # tile_ds.SetProjection(ifd.projection)
+        #
+        # tf2 = '/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/fu.tif'
+        # tile2_ds = gdal.GetDriverByName('GTiff').Create(
+        #     tf2,
+        #     tile.max_x - tile.min_x,
+        #     tile.max_y - tile.min_y,
+        #     1,
+        #     gdal.GDT_Int16
+        # )
+        # tile2_ds.SetGeoTransform(tile_affine.to_gdal())
+        #
+        # tile2_band = tile2_ds.GetRasterBand(1)
+        # tile2_band.WriteArray(failed_uncertainty_int16, 0, 0)
+        # tile2_band.SetNoDataValue(0)
+        # tile2_band.FlushCache()
+        # tile2_ds.SetProjection(ifd.projection)
+        # print("jdone ")
 
     def get_outputs(self) -> QajsonOutputs:
 
@@ -416,12 +478,36 @@ class TvuCheck(GridCheck):
             error=self.error_message
         )
 
-        return QajsonOutputs(
-            execution=execution,
-            files=None,
-            count=None,
-            percentage=None,
-            messages=['TVU Check not implemented'],
-            data=None,
-            check_state=GridCheckState.cs_fail
-        )
+        data = {
+            "failed_cell_count": self.failed_cell_count,
+            "total_cell_count": self.total_cell_count,
+            "fraction_failed": self.failed_cell_count / self.total_cell_count,
+        }
+
+        if self.failed_cell_count > 0:
+            percent_failed = (
+                self.failed_cell_count / self.total_cell_count * 100
+            )
+            msg = (
+                f"{self.failed_cell_count} nodes failed the TVU check this "
+                f"represents {percent_failed:.1f}% of all nodes within data."
+            )
+            return QajsonOutputs(
+                execution=execution,
+                files=None,
+                count=None,
+                percentage=None,
+                messages=[msg],
+                data=data,
+                check_state=GridCheckState.cs_fail
+            )
+        else:
+            return QajsonOutputs(
+                execution=execution,
+                files=None,
+                count=None,
+                percentage=None,
+                messages=[],
+                data=data,
+                check_state=GridCheckState.cs_pass
+            )
