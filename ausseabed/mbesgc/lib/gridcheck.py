@@ -12,6 +12,7 @@ from .tiling import Tile
 import collections
 import numpy as np
 import numpy.ma as ma
+import scipy.ndimage as ndimage
 import geojson
 from geojson import MultiPolygon
 from osgeo import gdal, ogr, osr
@@ -138,6 +139,37 @@ class GridCheck:
         '''
         raise NotImplementedError
 
+    def _simplify_layer(self, in_lyr, out_lyr, simplify_distance):
+        '''
+        Creates a simplified layer from an input layer using GDAL's
+        simplify function
+        '''
+        for in_feat in in_lyr:
+            geom = in_feat.GetGeometryRef()
+            simple_geom = geom.Simplify(simplify_distance)
+            self.__add_geom(simple_geom, out_lyr)
+
+    def __add_geom(self, geom, out_lyr):
+        feature_def = out_lyr.GetLayerDefn()
+        out_feat = ogr.Feature(feature_def)
+        out_feat.SetGeometry(geom)
+        out_lyr.CreateFeature(out_feat)
+
+    def _grow_pixels(self, data_array, pixel_growth):
+        '''
+        Used for boolean data arrays, will grow out a non-zero (true) pixel
+        value by a certain number of pixels. Helps fatten up areas that fail
+        a check and supports more simple ploygonised geometry.
+        '''
+        def test_func(values):
+            return values.max()
+
+        return ndimage.generic_filter(
+            data_array,
+            test_func,
+            size=(pixel_growth, pixel_growth)
+        )
+
 
 class DensityCheck(GridCheck):
     '''
@@ -171,6 +203,11 @@ class DensityCheck(GridCheck):
 
         self.tiles_geojson = MultiPolygon()
 
+        # amount of padding to place around failing pixels
+        # this simplifies the geometry, and enlarges the failing area that
+        # will allow it to be shown in the UI more easily
+        self.pixel_growth = 5
+
     def run(
             self,
             ifd: InputFileDetails,
@@ -198,7 +235,16 @@ class DensityCheck(GridCheck):
         bad_cells_mask = density < self._min_spn
         bad_cells_mask.fill_value = False
         bad_cells_mask = bad_cells_mask.filled()
-        bad_cells_mask_int16 = bad_cells_mask.astype(np.int16)
+        bad_cells_mask_int8 = bad_cells_mask.astype(np.int8)
+
+        # grow out failed pixels to make them more obvious. We've already
+        # calculated the pass/fail stats so this won't impact results.
+        bad_cells_mask_int8 = self._grow_pixels(
+            bad_cells_mask_int8, self.pixel_growth)
+
+        # simplify distance is calculated as the distance pixels are grown out
+        # `ifd.geotransform[1]` is pixel size
+        simplify_distance = self.pixel_growth * ifd.geotransform[1]
 
         src_affine = Affine.from_gdal(*ifd.geotransform)
         tile_affine = src_affine * Affine.translation(
@@ -210,20 +256,20 @@ class DensityCheck(GridCheck):
             tile.max_x - tile.min_x,
             tile.max_y - tile.min_y,
             1,
-            gdal.GDT_Int16
+            gdal.GDT_Byte
         )
-        tf = '/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/t.tif'
+        # tf = '/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/t.tif'
         # tile_ds = gdal.GetDriverByName('GTiff').Create(
         #     tf,
         #     tile.max_x - tile.min_x,
         #     tile.max_y - tile.min_y,
         #     1,
-        #     gdal.GDT_Int16
+        #     gdal.GDT_Byte
         # )
         tile_ds.SetGeoTransform(tile_affine.to_gdal())
 
         tile_band = tile_ds.GetRasterBand(1)
-        tile_band.WriteArray(bad_cells_mask_int16, 0, 0)
+        tile_band.WriteArray(bad_cells_mask_int8, 0, 0)
         tile_band.SetNoDataValue(0)
         tile_band.FlushCache()
         tile_ds.SetProjection(ifd.projection)
@@ -252,11 +298,17 @@ class DensityCheck(GridCheck):
             callback=None
         )
 
+        ogr_simple_driver = ogr.GetDriverByName('Memory')
+        ogr_simple_dataset = ogr_simple_driver.CreateDataSource('failed_poly')
+        ogr_simple_layer = ogr_simple_dataset.CreateLayer('failed_poly', srs=None)
+
+        self._simplify_layer(ogr_layer, ogr_simple_layer, simplify_distance)
+
         ogr_srs_out = osr.SpatialReference()
         ogr_srs_out.ImportFromEPSG(4326)
         transform = osr.CoordinateTransformation(ogr_srs, ogr_srs_out)
 
-        for feature in ogr_layer:
+        for feature in ogr_simple_layer:
             transformed = feature.GetGeometryRef()
             transformed.Transform(transform)
 
@@ -265,6 +317,7 @@ class DensityCheck(GridCheck):
                 geojson_feature.geometry.coordinates
             )
 
+        ogr_simple_dataset.Destroy()
         ogr_dataset.Destroy()
 
         # # includes only the tile boundaries, used for debug
@@ -393,11 +446,22 @@ class TvuCheck(GridCheck):
         self._depth_error_factor = self.get_param(
             'Factor of Depth Dependent Errors')
 
+        self.tiles_geojson = MultiPolygon()
+
+        # amount of padding to place around failing pixels
+        # this simplifies the geometry, and enlarges the failing area that
+        # will allow it to be shown in the UI more easily
+        self.pixel_growth = 5
+
     def merge_results(self, last_check: GridCheck):
         self.start_time = last_check.start_time
 
         self.total_cell_count += last_check.total_cell_count
         self.failed_cell_count += last_check.failed_cell_count
+
+        self.tiles_geojson.coordinates.extend(
+            last_check.tiles_geojson.coordinates
+        )
 
     def run(
             self,
@@ -420,6 +484,10 @@ class TvuCheck(GridCheck):
         # array
         self.total_cell_count = int(uncertainty.count())
 
+        failed_uncertainty.fill_value = False
+        failed_uncertainty = failed_uncertainty.filled()
+        failed_uncertainty_int8 = failed_uncertainty.astype(np.int8)
+
         # count of cells that failed the check
         self.failed_cell_count = int(failed_uncertainty.sum())
         # fraction_failed = failed_cell_count / total_cell_count
@@ -427,15 +495,20 @@ class TvuCheck(GridCheck):
         # print(f"failed_cell_count = {failed_cell_count}")
         # print(f"fraction_failed = {fraction_failed}")
 
-        failed_uncertainty.fill_value = False
-        failed_uncertainty = failed_uncertainty.filled()
-        failed_uncertainty_int16 = failed_uncertainty.astype(np.int16)
+        # grow out failed pixels to make them more obvious. We've already
+        # calculated the pass/fail stats so this won't impact results.
+        failed_uncertainty_int8 = self._grow_pixels(
+            failed_uncertainty_int8, self.pixel_growth)
 
-        # src_affine = Affine.from_gdal(*ifd.geotransform)
-        # tile_affine = src_affine * Affine.translation(
-        #     tile.min_x,
-        #     tile.min_y
-        # )
+        # simplify distance is calculated as the distance pixels are grown out
+        # `ifd.geotransform[1]` is pixel size
+        simplify_distance = self.pixel_growth * ifd.geotransform[1]
+
+        src_affine = Affine.from_gdal(*ifd.geotransform)
+        tile_affine = src_affine * Affine.translation(
+            tile.min_x,
+            tile.min_y
+        )
         # tf = '/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/au2.tif'
         # tile_ds = gdal.GetDriverByName('GTiff').Create(
         #     tf,
@@ -444,30 +517,94 @@ class TvuCheck(GridCheck):
         #     1,
         #     gdal.GDT_Float32
         # )
-        # tile_ds.SetGeoTransform(tile_affine.to_gdal())
-        #
-        # tile_band = tile_ds.GetRasterBand(1)
-        # tile_band.WriteArray(allowable_uncertainty, 0, 0)
-        # tile_band.SetNoDataValue(0)
-        # tile_band.FlushCache()
-        # tile_ds.SetProjection(ifd.projection)
+        tile_ds = gdal.GetDriverByName('MEM').Create(
+            '',
+            tile.max_x - tile.min_x,
+            tile.max_y - tile.min_y,
+            1,
+            gdal.GDT_Float32
+        )
+        tile_ds.SetGeoTransform(tile_affine.to_gdal())
+
+        tile_band = tile_ds.GetRasterBand(1)
+        tile_band.WriteArray(allowable_uncertainty, 0, 0)
+        tile_band.SetNoDataValue(0)
+        tile_band.FlushCache()
+        tile_ds.SetProjection(ifd.projection)
         #
         # tf2 = '/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/fu.tif'
-        # tile2_ds = gdal.GetDriverByName('GTiff').Create(
+        # tile_failed_ds = gdal.GetDriverByName('GTiff').Create(
         #     tf2,
         #     tile.max_x - tile.min_x,
         #     tile.max_y - tile.min_y,
         #     1,
-        #     gdal.GDT_Int16
+        #     gdal.GDT_Byte
         # )
-        # tile2_ds.SetGeoTransform(tile_affine.to_gdal())
-        #
-        # tile2_band = tile2_ds.GetRasterBand(1)
-        # tile2_band.WriteArray(failed_uncertainty_int16, 0, 0)
-        # tile2_band.SetNoDataValue(0)
-        # tile2_band.FlushCache()
-        # tile2_ds.SetProjection(ifd.projection)
-        # print("jdone ")
+        tile_failed_ds = gdal.GetDriverByName('MEM').Create(
+            '',
+            tile.max_x - tile.min_x,
+            tile.max_y - tile.min_y,
+            1,
+            gdal.GDT_Byte
+        )
+        tile_failed_ds.SetGeoTransform(tile_affine.to_gdal())
+
+        tile_failed_band = tile_failed_ds.GetRasterBand(1)
+        tile_failed_band.WriteArray(failed_uncertainty_int8, 0, 0)
+        tile_failed_band.SetNoDataValue(0)
+        tile_failed_band.FlushCache()
+        tile_failed_ds.SetProjection(ifd.projection)
+
+        # dst_layername = "POLYGONIZED_STUFF"
+        # drv = ogr.GetDriverByName("ESRI Shapefile")
+        # dst_ds = drv.CreateDataSource(tf + ".shp")
+        # dst_layer = dst_ds.CreateLayer(dst_layername, srs = None )
+        ogr_srs = osr.SpatialReference()
+        ogr_srs.ImportFromWkt(ifd.projection)
+
+        ogr_driver = ogr.GetDriverByName('Memory')
+        ogr_dataset = ogr_driver.CreateDataSource('shapemask')
+        ogr_layer = ogr_dataset.CreateLayer('shapemask', srs=ogr_srs)
+
+        # ogr_driver = ogr.GetDriverByName("ESRI Shapefile")
+        # ogr_dataset = ogr_driver.CreateDataSource(tf2 + "_2.shp")
+        # ogr_layer = ogr_dataset.CreateLayer("failed_poly", srs=None)
+
+        # used the input raster data 'tile_band' as the input and mask, if not
+        # used as a mask then a feature that outlines the entire dataset is
+        # also produced
+        gdal.Polygonize(
+            tile_failed_band,
+            tile_failed_band,
+            ogr_layer,
+            -1,
+            [],
+            callback=None
+        )
+
+        ogr_simple_driver = ogr.GetDriverByName('Memory')
+        ogr_simple_dataset = ogr_simple_driver.CreateDataSource('failed_poly')
+        ogr_simple_layer = ogr_simple_dataset.CreateLayer('failed_poly', srs=None)
+
+        self._simplify_layer(ogr_layer, ogr_simple_layer, simplify_distance)
+
+        ogr_srs_out = osr.SpatialReference()
+        ogr_srs_out.ImportFromEPSG(4326)
+        transform = osr.CoordinateTransformation(ogr_srs, ogr_srs_out)
+
+        for feature in ogr_simple_layer:
+            # transform feature into epsg:4326 before export to geojson
+            transformed = feature.GetGeometryRef()
+            transformed.Transform(transform)
+
+            geojson_feature = geojson.loads(feature.ExportToJson())
+
+            self.tiles_geojson.coordinates.extend(
+                geojson_feature.geometry.coordinates
+            )
+
+        ogr_simple_dataset.Destroy()
+        ogr_dataset.Destroy()
 
     def get_outputs(self) -> QajsonOutputs:
 
@@ -483,6 +620,8 @@ class TvuCheck(GridCheck):
             "total_cell_count": self.total_cell_count,
             "fraction_failed": self.failed_cell_count / self.total_cell_count,
         }
+
+        data['map'] = self.tiles_geojson
 
         if self.failed_cell_count > 0:
             percent_failed = (
