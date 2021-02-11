@@ -89,7 +89,6 @@ def cli(
         print(check_id)
         output = check.get_outputs()
         output_dict = output.to_dict()
-        print(output_dict)
         print(json.dumps(output_dict, indent=4))
 
     # src_ds = gdal.Open(input_file)
