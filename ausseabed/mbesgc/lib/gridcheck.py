@@ -650,3 +650,283 @@ class TvuCheck(GridCheck):
                 data=data,
                 check_state=GridCheckState.cs_pass
             )
+
+
+class ResolutionCheck(GridCheck):
+    '''
+    Determines what areas of the grid satisfy a resolution check. The check
+    first calculates a feature detection size (fds) on a per pixel basis, two
+    values for this are calculated above and below a threshold depth. In both
+    cases the fds value is calculated from the pixels depth and linear equation
+    parameters provided as input parameters to this check. eg;
+
+        fds = Depth Multiplier * depth + Depth Constant
+
+    This equation is calculated using different a different Depth Multiplier
+    and Depth Constant depending on whether the depth at that location is
+    above of below the threshold.
+
+    Once fds has been calculated per pixel a boolean check is performed to find
+    pixels where the grid resolution is lower than the fds * feature
+    detection multiplier. If any pixel is false, then the QA check fails.
+
+    '''
+
+    id = 'c73119ea-4f79-4001-86e3-11c4cbaaeb2d'
+    name = 'Resolution Check'
+    version = '1'
+
+    # default values taken from IHO - 1a spec
+    input_params = [
+        QajsonParam("Feature Detection Size Multiplier", 1.0),
+        QajsonParam("Threshold Depth", 40.0),
+        QajsonParam("Above Threshold FDS Depth Multiplier", 0.0),
+        QajsonParam("Above Threshold FDS Depth Constant", 2),
+        QajsonParam("Below Threshold FDS Depth Multiplier", 0.025),
+        QajsonParam("Below Threshold FDS Depth Constant", 0)
+    ]
+
+    def __init__(self, input_params: List[QajsonParam]):
+        super().__init__(input_params)
+
+        self._fds_multiplier = self.get_param(
+            'Feature Detection Size Multiplier')
+
+        self._threshold_depth = self.get_param(
+            'Threshold Depth')
+
+        self._a_fds_depth_multiplier = self.get_param(
+            'Above Threshold FDS Depth Multiplier')
+        self._a_fds_depth_constant = self.get_param(
+            'Above Threshold FDS Depth Constant')
+
+        self._b_fds_depth_multiplier = self.get_param(
+            'Below Threshold FDS Depth Multiplier')
+        self._b_fds_depth_constant = self.get_param(
+            'Below Threshold FDS Depth Constant')
+
+        self.tiles_geojson = MultiPolygon()
+
+        # amount of padding to place around failing pixels
+        # this simplifies the geometry, and enlarges the failing area that
+        # will allow it to be shown in the UI more easily
+        self.pixel_growth = 5
+
+    def merge_results(self, last_check: GridCheck):
+        self.start_time = last_check.start_time
+
+        self.total_cell_count += last_check.total_cell_count
+        self.failed_cell_count += last_check.failed_cell_count
+
+        self.tiles_geojson.coordinates.extend(
+            last_check.tiles_geojson.coordinates
+        )
+
+    def run(
+            self,
+            ifd: InputFileDetails,
+            tile: Tile,
+            depth,
+            density,
+            uncertainty,
+            progress_callback=None):
+        # run check on tile data
+
+        abs_depth = np.abs(depth)
+        abs_threshold_depth = abs(self._threshold_depth)
+
+        # refer to docs at top of class defn, this is described there
+        fds = np.piecewise(
+          abs_depth,
+          [
+            abs_depth < abs_threshold_depth,
+            abs_depth >= abs_threshold_depth
+          ],
+          [
+            lambda d: self._a_fds_depth_multiplier * d + self._a_fds_depth_constant,
+            lambda d: self._b_fds_depth_multiplier * d + self._b_fds_depth_constant
+          ]
+        )
+
+        self.grid_resolution = ifd.geotransform[1]
+        # easier to calc a feature size from a single grid resolution and the
+        # FDS multiplier than to rescale the whole fds array
+        feature_size = self.grid_resolution / self._fds_multiplier
+
+        # failed pixels is where the calculated feature detection size is
+        # larger than the feature size
+        # failed_resolution = fds > feature_size
+        failed_resolution = np.where(fds > feature_size, True, False)
+
+        # count of all cells/nodes/pixels that are not NaN in the uncertainty
+        # array
+        self.total_cell_count = int(depth.count())
+
+        # failed_resolution.fill_value = False
+        # failed_resolution = failed_resolution.filled()
+        failed_resolution_int8 = failed_resolution.astype(np.int8)
+
+        # count of cells that failed the check
+        self.failed_cell_count = int(failed_resolution.sum())
+        # fraction_failed = failed_cell_count / total_cell_count
+        # print(f"total = {total_cell_count}")
+        # print(f"failed_cell_count = {failed_cell_count}")
+        # print(f"fraction_failed = {fraction_failed}")
+
+        # grow out failed pixels to make them more obvious. We've already
+        # calculated the pass/fail stats so this won't impact results.
+        failed_resolution_int8 = self._grow_pixels(
+            failed_resolution_int8, self.pixel_growth)
+
+        # simplify distance is calculated as the distance pixels are grown out
+        # `ifd.geotransform[1]` is pixel size
+        simplify_distance = self.pixel_growth * ifd.geotransform[1]
+
+        src_affine = Affine.from_gdal(*ifd.geotransform)
+        tile_affine = src_affine * Affine.translation(
+            tile.min_x,
+            tile.min_y
+        )
+        # tf = '/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/au2.tif'
+        # tile_ds = gdal.GetDriverByName('GTiff').Create(
+        #     tf,
+        #     tile.max_x - tile.min_x,
+        #     tile.max_y - tile.min_y,
+        #     1,
+        #     gdal.GDT_Float32
+        # )
+        tile_ds = gdal.GetDriverByName('MEM').Create(
+            '',
+            tile.max_x - tile.min_x,
+            tile.max_y - tile.min_y,
+            1,
+            gdal.GDT_Float32
+        )
+        tile_ds.SetGeoTransform(tile_affine.to_gdal())
+
+        tile_band = tile_ds.GetRasterBand(1)
+        tile_band.WriteArray(fds, 0, 0)
+        tile_band.SetNoDataValue(0)
+        tile_band.FlushCache()
+        tile_ds.SetProjection(ifd.projection)
+        #
+        # tf2 = '/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/fu.tif'
+        # tile_failed_ds = gdal.GetDriverByName('GTiff').Create(
+        #     tf2,
+        #     tile.max_x - tile.min_x,
+        #     tile.max_y - tile.min_y,
+        #     1,
+        #     gdal.GDT_Byte
+        # )
+        tile_failed_ds = gdal.GetDriverByName('MEM').Create(
+            '',
+            tile.max_x - tile.min_x,
+            tile.max_y - tile.min_y,
+            1,
+            gdal.GDT_Byte
+        )
+        tile_failed_ds.SetGeoTransform(tile_affine.to_gdal())
+
+        tile_failed_band = tile_failed_ds.GetRasterBand(1)
+        tile_failed_band.WriteArray(failed_resolution_int8, 0, 0)
+        tile_failed_band.SetNoDataValue(0)
+        tile_failed_band.FlushCache()
+        tile_failed_ds.SetProjection(ifd.projection)
+
+        # dst_layername = "POLYGONIZED_STUFF"
+        # drv = ogr.GetDriverByName("ESRI Shapefile")
+        # dst_ds = drv.CreateDataSource(tf + ".shp")
+        # dst_layer = dst_ds.CreateLayer(dst_layername, srs = None )
+        ogr_srs = osr.SpatialReference()
+        ogr_srs.ImportFromWkt(ifd.projection)
+
+        ogr_driver = ogr.GetDriverByName('Memory')
+        ogr_dataset = ogr_driver.CreateDataSource('shapemask')
+        ogr_layer = ogr_dataset.CreateLayer('shapemask', srs=ogr_srs)
+
+        # ogr_driver = ogr.GetDriverByName("ESRI Shapefile")
+        # ogr_dataset = ogr_driver.CreateDataSource(tf2 + "_2.shp")
+        # ogr_layer = ogr_dataset.CreateLayer("failed_poly", srs=None)
+
+        # used the input raster data 'tile_band' as the input and mask, if not
+        # used as a mask then a feature that outlines the entire dataset is
+        # also produced
+        gdal.Polygonize(
+            tile_failed_band,
+            tile_failed_band,
+            ogr_layer,
+            -1,
+            [],
+            callback=None
+        )
+
+        ogr_simple_driver = ogr.GetDriverByName('Memory')
+        ogr_simple_dataset = ogr_simple_driver.CreateDataSource('failed_poly')
+        ogr_simple_layer = ogr_simple_dataset.CreateLayer('failed_poly', srs=None)
+
+        self._simplify_layer(ogr_layer, ogr_simple_layer, simplify_distance)
+
+        ogr_srs_out = osr.SpatialReference()
+        ogr_srs_out.ImportFromEPSG(4326)
+        transform = osr.CoordinateTransformation(ogr_srs, ogr_srs_out)
+
+        for feature in ogr_simple_layer:
+            # transform feature into epsg:4326 before export to geojson
+            transformed = feature.GetGeometryRef()
+            transformed.Transform(transform)
+
+            geojson_feature = geojson.loads(feature.ExportToJson())
+
+            self.tiles_geojson.coordinates.extend(
+                geojson_feature.geometry.coordinates
+            )
+
+        ogr_simple_dataset.Destroy()
+        ogr_dataset.Destroy()
+
+    def get_outputs(self) -> QajsonOutputs:
+
+        execution = QajsonExecution(
+            start=self.start_time,
+            end=self.end_time,
+            status=self.execution_status,
+            error=self.error_message
+        )
+
+        data = {
+            "failed_cell_count": self.failed_cell_count,
+            "total_cell_count": self.total_cell_count,
+            "fraction_failed": self.failed_cell_count / self.total_cell_count,
+            "grid_resolution": self.grid_resolution
+        }
+
+        data['map'] = self.tiles_geojson
+
+        if self.failed_cell_count > 0:
+            percent_failed = (
+                self.failed_cell_count / self.total_cell_count * 100
+            )
+            msg = (
+                f"{self.failed_cell_count} nodes failed the resolution check "
+                f"this represents {percent_failed:.1f}% of all nodes within "
+                "data."
+            )
+            return QajsonOutputs(
+                execution=execution,
+                files=None,
+                count=None,
+                percentage=None,
+                messages=[msg],
+                data=data,
+                check_state=GridCheckState.cs_fail
+            )
+        else:
+            return QajsonOutputs(
+                execution=execution,
+                files=None,
+                count=None,
+                percentage=None,
+                messages=[],
+                data=data,
+                check_state=GridCheckState.cs_pass
+            )

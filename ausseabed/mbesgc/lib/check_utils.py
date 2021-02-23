@@ -5,6 +5,7 @@ from .gridcheck import *
 
 all_checks = [
     DensityCheck,
+    ResolutionCheck,
     TvuCheck
 ]
 
