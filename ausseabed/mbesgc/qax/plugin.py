@@ -80,17 +80,7 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
 
         grid_data_checks = qajson.qa.survey_products.checks
         ifd_list = inputs_from_qajson_checks(grid_data_checks)
-        print("start")
-        for ifd in ifd_list:
-            print(ifd)
-        print("end")
         file_count = len(ifd_list)
-        print("count {}".format(file_count))
-
-        # for ifd in ifd_list:
-        #     if self.stopped:
-        #         break
-
 
         self.exe = Executor(ifd_list)
 
@@ -103,11 +93,7 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
         self.exe.run(pg_call)
 
         for (ifd, check_id), check in self.exe.check_result_cache.items():
-            print()
-            print(ifd)
-            print(check_id)
             check_outputs = check.get_outputs()
-            print(check_outputs)
 
             ifd.qajson_check.outputs = check_outputs
 
