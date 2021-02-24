@@ -372,9 +372,15 @@ class DensityCheck(GridCheck):
 
         lowest_sounding_count, occurances = next(iter(counts.items()))
         if lowest_sounding_count < self._min_spn:
+            c = 0
+            for sounding_count, occurances in iter(counts.items()):
+                if sounding_count >= self._min_spn:
+                    print(f"break {self._min_spn}")
+                    break
+                c += occurances
             messages.append(
-                f'Minimum sounding count of {lowest_sounding_count} occured '
-                f'{occurances} times'
+                f'{c} nodes were found to be under the Minimum Soundings per '
+                f'node setting ({self._min_spn})'
             )
             check_state = GridCheckState.cs_fail
 
