@@ -748,6 +748,10 @@ class ResolutionCheck(GridCheck):
           ]
         )
 
+        fds = np.ma.masked_where(np.ma.getmask(depth), fds)
+        fds.fill_value = -9999.0
+        fds = fds.filled()
+
         self.grid_resolution = ifd.geotransform[1]
         # easier to calc a feature size from a single grid resolution and the
         # FDS multiplier than to rescale the whole fds array
@@ -806,7 +810,7 @@ class ResolutionCheck(GridCheck):
 
         tile_band = tile_ds.GetRasterBand(1)
         tile_band.WriteArray(fds, 0, 0)
-        tile_band.SetNoDataValue(0)
+        tile_band.SetNoDataValue(-9999.0)
         tile_band.FlushCache()
         tile_ds.SetProjection(ifd.projection)
         #
