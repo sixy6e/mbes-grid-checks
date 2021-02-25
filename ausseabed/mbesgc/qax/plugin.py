@@ -2,7 +2,7 @@ from typing import List, Dict, NoReturn, Callable
 from pathlib import Path
 
 
-from ausseabed.mbesgc.lib.check_utils import all_checks
+from ausseabed.mbesgc.lib.allchecks import all_checks
 from ausseabed.mbesgc.lib.data import get_input_details, \
     inputs_from_qajson_checks
 from ausseabed.mbesgc.lib.executor import Executor
@@ -82,7 +82,7 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
         ifd_list = inputs_from_qajson_checks(grid_data_checks)
         file_count = len(ifd_list)
 
-        self.exe = Executor(ifd_list)
+        self.exe = Executor(ifd_list, all_checks)
 
         # the check_runner callback accepts only a float, whereas the qax
         # qwax plugin check tool callback requires a referece to a check tool

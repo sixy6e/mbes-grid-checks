@@ -16,6 +16,7 @@ from ausseabed.mbesgc.lib.data import get_input_details, \
     inputs_from_qajson_checks
 from ausseabed.mbesgc.lib.executor import Executor
 from ausseabed.mbesgc.lib.check_utils import get_all_check_ids
+from ausseabed.mbesgc.lib.allchecks import all_checks
 from ausseabed.qajson.parser import QajsonParser
 from ausseabed.qajson.model import QajsonCheck
 
@@ -54,12 +55,12 @@ def cli(
                 err=True)
             sys.exit(os.EX_NOINPUT)
 
-        all_check_ids = get_all_check_ids()
+        all_check_ids = get_all_check_ids(all_checks)
         inputs = get_input_details([grid_file])
         for input in inputs:
             input.check_ids_and_params = [(cid, None) for cid in all_check_ids]
 
-        exe = Executor(inputs)
+        exe = Executor(inputs, all_checks)
 
     elif input is not None:
         if not os.path.isfile(input):
@@ -74,7 +75,7 @@ def cli(
             spdatachecks = qajson['qa']['survey_products']['checks']
             inputs = inputs_from_qajson(spdatachecks, qajson_folder)
 
-            exe = Executor(inputs)
+            exe = Executor(inputs, all_checks)
     else:
         click.echo(
             "'-input' or '--grid-file' command line arg must be provided")

@@ -7,18 +7,21 @@ from osgeo import gdal
 import numpy as np
 import numpy.ma as ma
 
-from .check_utils import all_checks, get_check
+from .check_utils import get_check
 from .data import InputFileDetails, BandType
 from .tiling import get_tiles, Tile
 
 
 class Executor:
 
-    def __init__(self, input_file_details: List[InputFileDetails]):
+    def __init__(
+            self,
+            input_file_details: List[InputFileDetails],
+            check_classes):
         self.input_file_details = input_file_details
         self.tile_size_x = 2000
         self.tile_size_y = 2000
-        self.checks = all_checks
+        self.checks = check_classes
 
         # used to store the results of each check as the checks are run
         # across multiple tiles
@@ -84,7 +87,11 @@ class Executor:
             if self.stopped:
                 return
 
-            check_class = get_check(check_id)
+            check_class = get_check(check_id, self.checks)
+            if check_class is None:
+                # then the check is not supported by this tool
+                # so skip and move on
+                continue
             check = check_class(check_params)
 
             check.check_started()
