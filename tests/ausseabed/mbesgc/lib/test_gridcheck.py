@@ -1,6 +1,6 @@
 import unittest
 
-from ausseabed.mbesgc.lib.gridcheck import DensityCheck
+from ausseabed.mbesgc.lib.mbesgridcheck import DensityCheck
 
 
 class TestDensityCheck(unittest.TestCase):
