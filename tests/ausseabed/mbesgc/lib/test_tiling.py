@@ -22,5 +22,3 @@ class TestTiling(unittest.TestCase):
         self.assertEqual(tiles[-1].max_y, max_y)
 
         self.assertEqual(len(tiles), 3*4)
-
-        print(tiles)
