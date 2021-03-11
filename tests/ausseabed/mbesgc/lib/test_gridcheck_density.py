@@ -154,30 +154,3 @@ class TestDensityCheck(unittest.TestCase):
         # 95% so this should fail
         # "Minimum Soundings per node" is set to 0 so this wont be tripped.
         self.assertEqual(output.check_state, GridCheckState.cs_fail)
-
-    def test_tvu(self):
-        input_params = [
-            QajsonParam("Constant Depth Error", 0.1),
-            QajsonParam("Factor of Depth Dependent Errors", 0.007)
-        ]
-
-        check = TvuCheck(input_params)
-        check.run(
-            ifd=self.dummy_ifd,
-            tile=self.dummy_tile,
-            depth=self.depth,
-            density=self.density,
-            uncertainty=self.uncertainty
-        )
-
-        # 17 because three of the cells are masked
-        self.assertEqual(check.total_cell_count, 17)
-
-        # calculated uncertainty works out to be the following array
-        # [0.29732138 0.29732138 0.29732138 0.29732138]
-        # [0.29732138 0.4317407  0.5688585  0.29732138]
-        # [0.29732138 0.4317407  0.5001     0.29732138]
-        # [0.29732138 0.23259409 0.5001     0.29732138]
-        # [0.29732138 0.29732138 0.29732138 0.29732138]
-        # and these values exceed the actual uncertainty data in 5 locations
-        self.assertEqual(check.failed_cell_count, 5)
