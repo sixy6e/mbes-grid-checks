@@ -4,7 +4,7 @@ import unittest
 from ausseabed.qajson.model import QajsonParam, QajsonOutputs, QajsonExecution
 
 from ausseabed.mbesgc.lib.gridcheck import GridCheck, GridCheckState, GridCheckResult
-from ausseabed.mbesgc.lib.mbesgridcheck import DensityCheck
+from ausseabed.mbesgc.lib.mbesgridcheck import DensityCheck, TvuCheck
 from ausseabed.mbesgc.lib.data import InputFileDetails
 from ausseabed.mbesgc.lib.tiling import Tile
 
@@ -25,7 +25,6 @@ class TestDensityCheck(unittest.TestCase):
         cls.dummy_tile = Tile(0, 0, 5, 5)
 
         # set up some dummy data
-        cls.depth = None
         mask = [
             [False,  False,  False, False],
             [False,  False,  False, False],
@@ -33,6 +32,17 @@ class TestDensityCheck(unittest.TestCase):
             [False,  False,  False, True],
             [False,  False,  True, True]
         ]
+        depth_data = [
+            [-40,  -40,  -40, -40],
+            [-40,  -60,  -80, -40],
+            [-40,  -60,  -70, -40],
+            [-40,  -30,  -70, -40],
+            [-40,  -40,  -40, -40]
+        ]
+        cls.depth = np.ma.array(
+            np.array(depth_data, dtype=np.float32),
+            mask=mask
+        )
         density_data = [
             [10,  1,  9, 9],
             [10,  2, 10, 10],
@@ -44,21 +54,17 @@ class TestDensityCheck(unittest.TestCase):
             np.array(density_data, dtype=np.float32),
             mask=mask
         )
-        cls.uncertainty = None
-
-    # def test_density(self):
-    #     depth = None
-    #     uncertainty = None
-    #     density = np.array([
-    #         [10, 10, 10, 0, 0],
-    #         [1, 2, 3, 0, 0],
-    #         [1, 2, 3, 0, 0],
-    #         [1, 2, 3, 0, 0],
-    #         [1, 2, 3, 0, 0]],
-    #         np.float32
-    #     )
-    #
-    #     check = DensityCheck()
+        uncertainty_data = [
+            [0.7,  0.7,  0.2, 0.2],
+            [0.7,  0.4,  0.2, 0.2],
+            [0.2,  0.2,  0.2, 0.9],
+            [0.2,  0.2,  0.9, 0.0],
+            [0.2,  0.2,  0.2, 0.0]
+        ]
+        cls.uncertainty = np.ma.array(
+            np.array(uncertainty_data, dtype=np.float32),
+            mask=mask
+        )
 
     def test_result_hist_chunk_merge(self):
         res_a = {
@@ -141,8 +147,6 @@ class TestDensityCheck(unittest.TestCase):
             uncertainty=self.uncertainty
         )
 
-        density_histogram = check.density_histogram
-
         # now check the output data
         output = check.get_outputs()
         # two out of 17 nodes are below the min soundings per node at
@@ -150,4 +154,30 @@ class TestDensityCheck(unittest.TestCase):
         # 95% so this should fail
         # "Minimum Soundings per node" is set to 0 so this wont be tripped.
         self.assertEqual(output.check_state, GridCheckState.cs_fail)
-        print(output)
+
+    def test_tvu(self):
+        input_params = [
+            QajsonParam("Constant Depth Error", 0.1),
+            QajsonParam("Factor of Depth Dependent Errors", 0.007)
+        ]
+
+        check = TvuCheck(input_params)
+        check.run(
+            ifd=self.dummy_ifd,
+            tile=self.dummy_tile,
+            depth=self.depth,
+            density=self.density,
+            uncertainty=self.uncertainty
+        )
+
+        # 17 because three of the cells are masked
+        self.assertEqual(check.total_cell_count, 17)
+
+        # calculated uncertainty works out to be the following array
+        # [0.29732138 0.29732138 0.29732138 0.29732138]
+        # [0.29732138 0.4317407  0.5688585  0.29732138]
+        # [0.29732138 0.4317407  0.5001     0.29732138]
+        # [0.29732138 0.23259409 0.5001     0.29732138]
+        # [0.29732138 0.29732138 0.29732138 0.29732138]
+        # and these values exceed the actual uncertainty data in 5 locations
+        self.assertEqual(check.failed_cell_count, 5)
