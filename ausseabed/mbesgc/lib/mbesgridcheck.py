@@ -118,7 +118,6 @@ class DensityCheck(GridCheck):
         tile_band.FlushCache()
         tile_ds.SetProjection(ifd.projection)
 
-
         # dst_layername = "POLYGONIZED_STUFF"
         # drv = ogr.GetDriverByName("ESRI Shapefile")
         # dst_ds = drv.CreateDataSource(tf + ".shp")
