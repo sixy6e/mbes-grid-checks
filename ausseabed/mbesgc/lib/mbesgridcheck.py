@@ -240,8 +240,8 @@ class DensityCheck(GridCheck):
 
         if percentage_over_threshold < self._min_spn_p:
             messages.append(
-                f'{percentage_over_threshold}% of nodes were found to have a '
-                f'sounding count below {self._min_spn_ap}. This is required to'
+                f'{percentage_over_threshold:.1f}% of nodes were found to have a '
+                f'sounding count above {self._min_spn_ap}. This is required to'
                 f' be {self._min_spn_p}% of all nodes'
             )
             check_state = GridCheckState.cs_fail
