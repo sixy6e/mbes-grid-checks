@@ -8,6 +8,7 @@
 import click
 import json
 import os
+import sys
 
 from osgeo import gdal
 from typing import Optional, Dict, List, Any
@@ -79,7 +80,7 @@ def cli(
     else:
         click.echo(
             "'-input' or '--grid-file' command line arg must be provided")
-
+        sys.exit(os.EX_NOINPUT)
 
     def print_prog(progress):
         click.echo(f"progress = {progress}")
