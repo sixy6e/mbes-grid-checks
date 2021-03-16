@@ -16,7 +16,7 @@ from typing import Optional, Dict, List, Any
 from ausseabed.mbesgc.lib.data import get_input_details, \
     inputs_from_qajson_checks
 from ausseabed.mbesgc.lib.executor import Executor
-from ausseabed.mbesgc.lib.check_utils import get_all_check_ids
+from ausseabed.mbesgc.lib.check_utils import get_all_check_ids, get_check
 from ausseabed.mbesgc.lib.allchecks import all_checks
 from ausseabed.qajson.parser import QajsonParser
 from ausseabed.qajson.model import QajsonCheck
@@ -56,10 +56,18 @@ def cli(
                 err=True)
             sys.exit(os.EX_NOINPUT)
 
+        # build a list of the check ids that will be run, and include default
+        # parameters for each one.
         all_check_ids = get_all_check_ids(all_checks)
-        inputs = get_input_details([grid_file])
+        all_check_ids_and_params = []
+        for check_id in all_check_ids:
+            check = get_check(check_id, all_checks)
+            check_default_params = check.input_params
+            all_check_ids_and_params.append( (check_id, check_default_params) )
+
+        inputs = get_input_details(None, [grid_file])
         for input in inputs:
-            input.check_ids_and_params = [(cid, None) for cid in all_check_ids]
+            input.check_ids_and_params = all_check_ids_and_params
 
         exe = Executor(inputs, all_checks)
 
