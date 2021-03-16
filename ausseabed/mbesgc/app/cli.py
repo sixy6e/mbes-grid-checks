@@ -101,20 +101,6 @@ def cli(
         output_dict = output.to_dict()
         print(json.dumps(output_dict, indent=4))
 
-    # src_ds = gdal.Open(input_file)
-    # if src_ds is None:
-    #     print('Unable to open {}'.format(input_file))
-    #     sys.exit(1)
-    #
-    # for band in range(src_ds.RasterCount):
-    #     band += 1
-    #
-    #     src_band = src_ds.GetRasterBand(band)
-    #     src_data_type = src_band.DataType
-    #     src_data_type_name = gdal.GetDataTypeName(src_data_type)
-    #     print("band: {}".format(band))
-    #     print("  data type: {}".format(src_data_type_name))
-
 
 if __name__ == '__main__':
     cli()
