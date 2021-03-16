@@ -218,7 +218,6 @@ class DensityCheck(GridCheck):
             c = 0
             for sounding_count, occurances in iter(counts.items()):
                 if sounding_count >= self._min_spn:
-                    print(f"break {self._min_spn}")
                     break
                 c += occurances
             messages.append(

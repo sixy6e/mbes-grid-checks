@@ -95,8 +95,6 @@ def cli(
     exe.run(print_prog)
 
     for check_id, check in exe.check_result_cache.items():
-        print()
-        print(check_id)
         output = check.get_outputs()
         output_dict = output.to_dict()
         print(json.dumps(output_dict, indent=4))
