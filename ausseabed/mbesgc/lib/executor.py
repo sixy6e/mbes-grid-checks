@@ -68,7 +68,6 @@ class Executor:
             uncertainty_file, uncertainty_band_idx, tile)
 
         density_data = density_data.astype(int)
-        occurrences = np.count_nonzero(density_data == 1)
 
         return (depth_data, density_data, uncertainty_data)
 
@@ -153,7 +152,7 @@ class Executor:
             # It's much more performant do only load the data for each tile
             # once, and then run all the checks over the loaded tile
             # before moving onto the next
-            for tile_idx, tile in enumerate(tiles):
+            for _, tile in enumerate(tiles):
                 if self.stopped:
                     return
 
