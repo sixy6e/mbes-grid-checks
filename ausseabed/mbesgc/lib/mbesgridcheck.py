@@ -1,7 +1,7 @@
 from typing import Optional, Dict, List, Any
 from ausseabed.qajson.model import QajsonParam, QajsonOutputs, QajsonExecution
-from .data import InputFileDetails
-from .tiling import Tile
+from ausseabed.mbesgc.lib.data import InputFileDetails
+from ausseabed.mbesgc.lib.tiling import Tile
 
 import collections
 import numpy as np
@@ -67,7 +67,7 @@ class DensityCheck(GridCheck):
         unique_vals, unique_counts = np.unique(density, return_counts=True)
         hist = {}
         for (val, count) in zip(unique_vals, unique_counts):
-            if type(val) is ma.core.MaskedConstant:
+            if isinstance(val, ma.core.MaskedConstant):
                 continue
             # following gets serialized to JSON and as numpy types are not
             # supported by default we convert the float32 and int64 types to
@@ -143,7 +143,8 @@ class DensityCheck(GridCheck):
 
         ogr_simple_driver = ogr.GetDriverByName('Memory')
         ogr_simple_dataset = ogr_simple_driver.CreateDataSource('failed_poly')
-        ogr_simple_layer = ogr_simple_dataset.CreateLayer('failed_poly', srs=None)
+        ogr_simple_layer = ogr_simple_dataset.CreateLayer(
+            'failed_poly', srs=None)
 
         self._simplify_layer(ogr_layer, ogr_simple_layer, simplify_distance)
 
@@ -432,7 +433,8 @@ class TvuCheck(GridCheck):
 
         ogr_simple_driver = ogr.GetDriverByName('Memory')
         ogr_simple_dataset = ogr_simple_driver.CreateDataSource('failed_poly')
-        ogr_simple_layer = ogr_simple_dataset.CreateLayer('failed_poly', srs=None)
+        ogr_simple_layer = ogr_simple_dataset.CreateLayer(
+            'failed_poly', srs=None)
 
         self._simplify_layer(ogr_layer, ogr_simple_layer, simplify_distance)
 
@@ -585,15 +587,15 @@ class ResolutionCheck(GridCheck):
 
         # refer to docs at top of class defn, this is described there
         fds = np.piecewise(
-          abs_depth,
-          [
-            abs_depth < abs_threshold_depth,
-            abs_depth >= abs_threshold_depth
-          ],
-          [
-            lambda d: self._a_fds_depth_multiplier * d + self._a_fds_depth_constant,
-            lambda d: self._b_fds_depth_multiplier * d + self._b_fds_depth_constant
-          ]
+            abs_depth,
+            [
+                abs_depth < abs_threshold_depth,
+                abs_depth >= abs_threshold_depth
+            ],
+            [
+                lambda d: self._a_fds_depth_multiplier * d + self._a_fds_depth_constant,
+                lambda d: self._b_fds_depth_multiplier * d + self._b_fds_depth_constant
+            ]
         )
 
         fds = np.ma.masked_where(np.ma.getmask(depth), fds)
@@ -714,7 +716,8 @@ class ResolutionCheck(GridCheck):
 
         ogr_simple_driver = ogr.GetDriverByName('Memory')
         ogr_simple_dataset = ogr_simple_driver.CreateDataSource('failed_poly')
-        ogr_simple_layer = ogr_simple_dataset.CreateLayer('failed_poly', srs=None)
+        ogr_simple_layer = ogr_simple_dataset.CreateLayer(
+            'failed_poly', srs=None)
 
         self._simplify_layer(ogr_layer, ogr_simple_layer, simplify_distance)
 

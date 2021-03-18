@@ -6,11 +6,16 @@ to what they represent
 
 from enum import Enum
 from osgeo import gdal
-from typing import Tuple, List
+from typing import Tuple, List, Type
 import os
 import os.path
 
-from ausseabed.qajson.model import QajsonCheck
+from ausseabed.qajson.model import QajsonCheck, QajsonRoot, \
+    QajsonParam, QajsonQa, QajsonDataLevel, QajsonInfo, QajsonGroup, \
+    QajsonInputs, QajsonFile
+from ausseabed.qajson.utils import latest_schema_version
+
+# from ausseabed.mbesgc.lib.gridcheck import GridCheck
 
 
 class BandType(str, Enum):
@@ -174,7 +179,7 @@ def _get_bag_details(input_file):
 def get_input_details(
         qajson_check: QajsonCheck,
         inputfiles: List[str],
-        relative_to: str = None) -> List[str]:
+        relative_to: str = None) -> List[InputFileDetails]:
     '''
     Extracts relevant band numbers, size(px), and appropriate file names
     from list of input files.
@@ -225,3 +230,47 @@ def inputs_from_qajson_checks(
             ci.check_ids_and_params.append(cid_and_params)
         inputs.extend(check_inputs)
     return inputs
+
+
+def qajson_from_inputs(
+        input: InputFileDetails,
+        check_classes: List[Type['GridCheck']]) -> QajsonRoot:
+
+    checks = []
+    for check_class in check_classes:
+        info = QajsonInfo(
+            id=check_class.id,
+            name=check_class.name,
+            description=None,
+            version=check_class.version,
+            group=QajsonGroup("", "", ""),
+        )
+
+        input_file_path, _, _ = input.input_band_details[0]
+        input_file = QajsonFile(
+            path=input_file_path,
+            file_type="Survey DTMs",
+            description=None
+        )
+
+        inputs = QajsonInputs(
+            files=[input_file],
+            params=check_class.input_params
+        )
+        check = QajsonCheck(
+            info=info,
+            inputs=inputs,
+            outputs=None
+        )
+        checks.append(check)
+
+    datalevel = QajsonDataLevel(checks=checks)
+    qa = QajsonQa(
+        version=latest_schema_version(),
+        raw_data=QajsonDataLevel([]),
+        survey_products=datalevel,
+        chart_adequacy=None
+    )
+    root = QajsonRoot(qa)
+
+    return root

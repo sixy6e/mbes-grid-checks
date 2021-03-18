@@ -1,4 +1,4 @@
-from .mbesgridcheck import *
+from ausseabed.mbesgc.lib.mbesgridcheck import *
 
 all_checks = [
     DensityCheck,
