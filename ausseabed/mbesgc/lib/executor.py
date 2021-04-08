@@ -27,8 +27,6 @@ class Executor:
         # across multiple tiles
         self.check_result_cache = {}
 
-        self.stopped = False
-
     def _load_band_tile(self, filename: str, band_index: int, tile: Tile):
         src_ds = gdal.Open(filename)
         if src_ds is None:
@@ -72,18 +70,20 @@ class Executor:
         return (depth_data, density_data, uncertainty_data)
 
     def _run_checks(
-            self,
-            ifd: InputFileDetails,
-            tile: Tile,
-            depth_data,
-            density_data,
-            uncertainty_data):
+        self,
+        ifd: InputFileDetails,
+        tile: Tile,
+        depth_data,
+        density_data,
+        uncertainty_data,
+        is_stopped=None,
+    ):
         '''
         Runs each of the checks assigned to each file (via the
         InputFileDetails) on the loaded data arrays
         '''
         for check_id, check_params in ifd.check_ids_and_params:
-            if self.stopped:
+            if is_stopped is not None and is_stopped():
                 return
 
             check_class = get_check(check_id, self.checks)
@@ -118,11 +118,14 @@ class Executor:
         else:
             progress_callback(progress)
 
-    def run(self, progress_callback=None):
+    def run(
+        self,
+        progress_callback=None,
+        qajson_update_callback=None,
+        is_stopped=None
+    ):
         # clear out any previously run checks
         self.check_result_cache = {}
-
-        self.stopped = False
 
         # collect list of input files, and the list of tiles to be used for
         # each of these input files
@@ -153,7 +156,7 @@ class Executor:
             # once, and then run all the checks over the loaded tile
             # before moving onto the next
             for _, tile in enumerate(tiles):
-                if self.stopped:
+                if is_stopped is not None and is_stopped():
                     return
 
                 depth_data, density_data, uncertainty_data = self._load_data(
@@ -166,16 +169,11 @@ class Executor:
                     tile,
                     depth_data,
                     density_data,
-                    uncertainty_data
+                    uncertainty_data,
+                    is_stopped
                 )
                 processed_tile_count += 1
                 self.__update_progress(
                     progress_callback,
-                    processed_tile_count/total_tile_count
+                    processed_tile_count / total_tile_count
                 )
-
-    def stop(self):
-        '''
-        Stops the executor from running more checks
-        '''
-        self.stopped = True
