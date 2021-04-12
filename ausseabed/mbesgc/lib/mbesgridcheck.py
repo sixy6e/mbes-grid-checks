@@ -599,18 +599,17 @@ class ResolutionCheck(GridCheck):
         )
 
         fds = np.ma.masked_where(np.ma.getmask(depth), fds)
-        fds.fill_value = -9999.0
-        fds = fds.filled()
 
         self.grid_resolution = ifd.geotransform[1]
         # easier to calc a feature size from a single grid resolution and the
         # FDS multiplier than to rescale the whole fds array
         feature_size = self.grid_resolution / self._fds_multiplier
 
-        # failed pixels is where the calculated feature detection size is
-        # larger than the feature size
-        # failed_resolution = fds > feature_size
-        failed_resolution = np.where(fds > feature_size, True, False)
+        # The idea of the standard here is that the deeper the water gets the
+        # less ability you have to pick up features on the seafloor and also
+        # features become less important the deeper the water gets as under
+        # keel clearance for ships becomes less of an issue.
+        failed_resolution = fds < feature_size
 
         # count of all cells/nodes/pixels that are not NaN in the uncertainty
         # array
@@ -641,6 +640,12 @@ class ResolutionCheck(GridCheck):
             tile.min_x,
             tile.min_y
         )
+
+        # Switch from a masked array to an array with a nodata value, this allows
+        # us to include nodata in the gdal output.
+        # fds.fill_value = -9999.0
+        # fds = fds.filled()
+
         # tf = '/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/au2.tif'
         # tile_ds = gdal.GetDriverByName('GTiff').Create(
         #     tf,
@@ -649,21 +654,22 @@ class ResolutionCheck(GridCheck):
         #     1,
         #     gdal.GDT_Float32
         # )
-        tile_ds = gdal.GetDriverByName('MEM').Create(
-            '',
-            tile.max_x - tile.min_x,
-            tile.max_y - tile.min_y,
-            1,
-            gdal.GDT_Float32
-        )
-        tile_ds.SetGeoTransform(tile_affine.to_gdal())
+        # tild_ds was only ever used to support debugging
+        # tile_ds = gdal.GetDriverByName('MEM').Create(
+        #     '',
+        #     tile.max_x - tile.min_x,
+        #     tile.max_y - tile.min_y,
+        #     1,
+        #     gdal.GDT_Float32
+        # )
+        # tile_ds.SetGeoTransform(tile_affine.to_gdal())
 
-        tile_band = tile_ds.GetRasterBand(1)
-        tile_band.WriteArray(fds, 0, 0)
-        tile_band.SetNoDataValue(-9999.0)
-        tile_band.FlushCache()
-        tile_ds.SetProjection(ifd.projection)
-        #
+        # tile_band = tile_ds.GetRasterBand(1)
+        # tile_band.WriteArray(fds, 0, 0)
+        # tile_band.SetNoDataValue(-9999.0)
+        # tile_band.FlushCache()
+        # tile_ds.SetProjection(ifd.projection)
+
         # tf2 = '/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/fu.tif'
         # tile_failed_ds = gdal.GetDriverByName('GTiff').Create(
         #     tf2,

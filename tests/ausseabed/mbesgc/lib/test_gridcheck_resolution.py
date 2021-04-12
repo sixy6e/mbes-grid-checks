@@ -26,26 +26,26 @@ class TestDensityCheck(unittest.TestCase):
 
         # set up some dummy data
         mask = [
-            [False,  False,  False, False],
-            [False,  False,  False, False],
-            [False,  False,  False, False],
-            [False,  False,  False, True],
-            [False,  False,  True, True]
+            [False, False, False, False],
+            [False, False, False, False],
+            [False, False, False, False],
+            [False, False, False, True],
+            [False, False, True, True]
         ]
         depth_data = [
-            [-40,  -40,  -40, -40],
-            [-40,  -60,  -80, -40],
-            [-40,  -60,  -70, -40],
-            [-40,  -30,  -70, -40],
-            [-40,  -40,  -40, -40]
+            [-40, -40, -40, -40],
+            [-40, -60, -80, -40],
+            [-40, -60, -70, -40],
+            [-40, -30, -70, -40],
+            [-40, -40, -40, -40]
         ]
         cls.depth = np.ma.array(
             np.array(depth_data, dtype=np.float32),
             mask=mask
         )
         density_data = [
-            [10,  1,  9, 9],
-            [10,  2, 10, 10],
+            [10, 1, 9, 9],
+            [10, 2, 10, 10],
             [10, 10, 10, 10],
             [10, 10, 10, 10],
             [10, 10, 10, 10],
@@ -55,11 +55,11 @@ class TestDensityCheck(unittest.TestCase):
             mask=mask
         )
         uncertainty_data = [
-            [0.7,  0.7,  0.2, 0.2],
-            [0.7,  0.4,  0.2, 0.2],
-            [0.2,  0.2,  0.2, 0.9],
-            [0.2,  0.2,  0.9, 0.0],
-            [0.2,  0.2,  0.2, 0.0]
+            [0.7, 0.7, 0.2, 0.2],
+            [0.7, 0.4, 0.2, 0.2],
+            [0.2, 0.2, 0.2, 0.9],
+            [0.2, 0.2, 0.9, 0.0],
+            [0.2, 0.2, 0.2, 0.0]
         ]
         cls.uncertainty = np.ma.array(
             np.array(uncertainty_data, dtype=np.float32),
@@ -105,7 +105,8 @@ class TestDensityCheck(unittest.TestCase):
         # the grid resolution by this value. So for the purposes of this test
         # we use a "Feature Detection Size Multiplier" value of 1.5 to get
         # some nodes to fail; in this case it means any nodes with a calculated
-        # feature detection size above 1.333 will fail this check.
+        # feature detection size below 1.333 will fail this check.
 
-        # and these values exceed threshold in 6 locations
-        self.assertEqual(check.failed_cell_count, 6)
+        # and these values exceed threshold in 11 locations. Note that it's not
+        # 14 locations due to the masking of 3 cells (lower right corner)
+        self.assertEqual(check.failed_cell_count, 11)
