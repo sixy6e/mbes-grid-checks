@@ -29,7 +29,7 @@ class DensityCheck(GridCheck):
     input_params = [
         QajsonParam("Minimum Soundings per node", 5),
         QajsonParam("Minimum Soundings per node at percentage", 5),
-        QajsonParam("Minumum Soundings per node percentage", 95),
+        QajsonParam("Minumum Soundings per node percentage", 95.0),
     ]
 
     def __init__(self, input_params: List[QajsonParam]):
@@ -531,9 +531,9 @@ class ResolutionCheck(GridCheck):
         QajsonParam("Feature Detection Size Multiplier", 1.0),
         QajsonParam("Threshold Depth", 40.0),
         QajsonParam("Above Threshold FDS Depth Multiplier", 0.0),
-        QajsonParam("Above Threshold FDS Depth Constant", 2),
+        QajsonParam("Above Threshold FDS Depth Constant", 2.0),
         QajsonParam("Below Threshold FDS Depth Multiplier", 0.025),
-        QajsonParam("Below Threshold FDS Depth Constant", 0)
+        QajsonParam("Below Threshold FDS Depth Constant", 0.0)
     ]
 
     def __init__(self, input_params: List[QajsonParam]):
