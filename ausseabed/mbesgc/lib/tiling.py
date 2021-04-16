@@ -11,6 +11,14 @@ class Tile:
         self.max_x = max_x
         self.max_y = max_y
 
+    @property
+    def width(self):
+        return self.max_x - self.min_x
+
+    @property
+    def height(self):
+        return self.max_y - self.min_y
+
     def to_geojson(self, projection, geotransform):
         fwd = Affine.from_gdal(*geotransform)
 
