@@ -60,6 +60,13 @@ class DensityCheck(GridCheck):
             density,
             uncertainty,
             progress_callback=None):
+
+        self.total_cell_count = int(density.count())
+        # skip processing this chunk of data if it contains only nodata
+        if self.total_cell_count == 0:
+            self.density_histogram = {}
+            return
+
         # generate histogram of counts
         # unique_vals will be the soundings per node
         # unique_counts is the total number of times the unique_val soundings
@@ -324,14 +331,19 @@ class TvuCheck(GridCheck):
         a = self._depth_error
         b = self._depth_error_factor
 
+        # count of all cells/nodes/pixels that are not NaN in the uncertainty
+        # array
+        self.total_cell_count = int(uncertainty.count())
+
+        # skip processing this chunk of data if it contains only nodata
+        if self.total_cell_count == 0:
+            self.failed_cell_count = 0
+            return
+
         # calculate allowable uncertainty based on equation and depth data
         allowable_uncertainty = np.sqrt(a**2 + (b * depth)**2)
 
         failed_uncertainty = uncertainty > allowable_uncertainty
-
-        # count of all cells/nodes/pixels that are not NaN in the uncertainty
-        # array
-        self.total_cell_count = int(uncertainty.count())
 
         failed_uncertainty.fill_value = False
         failed_uncertainty = failed_uncertainty.filled()
@@ -582,6 +594,17 @@ class ResolutionCheck(GridCheck):
             progress_callback=None):
         # run check on tile data
 
+        self.grid_resolution = ifd.geotransform[1]
+
+        # count of all cells/nodes/pixels that are not NaN in the uncertainty
+        # array
+        self.total_cell_count = int(depth.count())
+
+        # skip processing this chunk of data if it contains only nodata
+        if self.total_cell_count == 0:
+            self.failed_cell_count = 0
+            return
+
         abs_depth = np.abs(depth)
         abs_threshold_depth = abs(self._threshold_depth)
 
@@ -600,7 +623,6 @@ class ResolutionCheck(GridCheck):
 
         fds = np.ma.masked_where(np.ma.getmask(depth), fds)
 
-        self.grid_resolution = ifd.geotransform[1]
         # easier to calc a feature size from a single grid resolution and the
         # FDS multiplier than to rescale the whole fds array
         feature_size = self.grid_resolution / self._fds_multiplier
@@ -610,10 +632,6 @@ class ResolutionCheck(GridCheck):
         # features become less important the deeper the water gets as under
         # keel clearance for ships becomes less of an issue.
         failed_resolution = fds < feature_size
-
-        # count of all cells/nodes/pixels that are not NaN in the uncertainty
-        # array
-        self.total_cell_count = int(depth.count())
 
         # failed_resolution.fill_value = False
         # failed_resolution = failed_resolution.filled()
