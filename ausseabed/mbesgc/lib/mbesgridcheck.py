@@ -633,8 +633,8 @@ class ResolutionCheck(GridCheck):
         # keel clearance for ships becomes less of an issue.
         failed_resolution = fds < feature_size
 
-        # failed_resolution.fill_value = False
-        # failed_resolution = failed_resolution.filled()
+        failed_resolution.fill_value = False
+        failed_resolution = failed_resolution.filled()
         failed_resolution_int8 = failed_resolution.astype(np.int8)
 
         # count of cells that failed the check
