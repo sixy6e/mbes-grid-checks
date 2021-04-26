@@ -21,7 +21,6 @@ class GridTransformer:
         self.output_datatype = gdal.GDT_Float32
         # set output nodata to -3.4028235e+38
         self.output_nodata = np.finfo(np.float32).min.item()
-        print(type(self.output_nodata))
         # data is chunked by tiles with this size
         self.error_messages = []
         self.warning_messages = []
@@ -42,7 +41,7 @@ class GridTransformer:
                 f"Depth ({depth.RasterXSize, depth.RasterYSize})\n"
                 f"Uncertainty ({uncertainty.RasterXSize, uncertainty.RasterYSize})"
             )
-            self.error_messages.append(
+            self._add_error(
                 f"Input file raster sizes do not match \n{sizes}")
             return False
 
@@ -60,19 +59,19 @@ class GridTransformer:
         output_datatype_name = gdal.GetDataTypeName(self.output_datatype)
         if density is not None and density.DataType != self.output_datatype:
             dtn = gdal.GetDataTypeName(density.DataType)
-            self.warning_messages.append(
+            self._add_warning(
                 f"Density input datatype ({dtn}) does not match output "
                 f"({output_datatype_name}) and will be converted."
             )
         if depth is not None and depth.DataType != self.output_datatype:
             dtn = gdal.GetDataTypeName(depth.DataType)
-            self.warning_messages.append(
+            self._add_warning(
                 f"Depth input datatype ({dtn}) does not match output "
                 f"({output_datatype_name}) and will be converted."
             )
         if uncertainty is not None and uncertainty.DataType != self.output_datatype:
             dtn = gdal.GetDataTypeName(uncertainty.DataType)
-            self.warning_messages.append(
+            self._add_warning(
                 f"Uncertainty input datatype ({dtn}) does not match output "
                 f"({output_datatype_name}) and will be converted."
             )
@@ -125,13 +124,30 @@ class GridTransformer:
         bs = depth.GetBlockSize()
         return (bs[0], bs[1])
 
+    def _add_warning(self, message):
+        self.warning_messages.append(message)
+        if self.message_callback is not None:
+            self.message_callback("WARNING: " + message)
+
+    def _add_error(self, message):
+        self.error_messages.append(message)
+        if self.message_callback is not None:
+            self.message_callback("ERROR: " + message)
+
+    def _complete(self, successful: bool):
+        if self.completed_callback is not None:
+            self.completed_callback(successful)
+
     def process(
             self,
             density: Tuple[str, int],
             depth: Tuple[str, int],
             uncertainty: Tuple[str, int],
             output: str,
-            progress_callback: Callable = None) -> bool:
+            progress_callback: Callable = None,
+            is_stopped: Callable = None,
+            completed_callback: Callable = None,
+            message_callback: Callable = None) -> bool:
         '''
         Runs the conversion process from 3 input files containing a single band each to
         one file containing 3 bands.
@@ -147,6 +163,13 @@ class GridTransformer:
                 process
             progress_callback (function): optional callback function to
                 indicate progress to caller
+            is_stopped (function): optional function if this returns true, the grid
+                transformation process should stop
+            completed_callback (function): optional callback function that is called
+                when the process has completed (due to finishing, or failing/being
+                stopped)
+            message_callback (function): optional callback function to
+                raise a message event to caller
 
         Returns:
             True if the process was successful, False if not.
@@ -154,6 +177,8 @@ class GridTransformer:
         '''
         self.error_messages = []
         self.warning_messages = []
+        self.message_callback = message_callback
+        self.completed_callback = completed_callback
         failed = False
         # use the passed in progress callback function if one defined, otherwise use the
         # default.
@@ -168,15 +193,15 @@ class GridTransformer:
         # to fail. Will allow user to debug multiple issues at once.
         if ds_density is None:
             failed = True
-            self.error_messages.append(
+            self._add_error(
                 f"Density input file ({density[0]}) could not be opened")
         if ds_depth is None:
             failed = True
-            self.error_messages.append(
+            self._add_error(
                 f"Depth input file ({depth[0]}) could not be opened")
         if ds_uncertainty is None:
             failed = True
-            self.error_messages.append(
+            self._add_error(
                 f"Uncertainty input file ({uncertainty[0]}) could not be opened")
 
         if not failed:
@@ -185,7 +210,14 @@ class GridTransformer:
             failed = not self._validate_sizes(
                 ds_density, ds_depth, ds_uncertainty)
 
+        if is_stopped is not None and is_stopped():
+            self._add_warning(
+                "Grid Transformer was stopped before output file creation")
+            self._complete(False)
+            return False
+
         if failed:
+            self._complete(False)
             return False
 
         b_density = ds_density.GetRasterBand(density[1])
@@ -194,21 +226,22 @@ class GridTransformer:
 
         if b_density is None:
             failed = True
-            self.error_messages.append(
+            self._add_error(
                 f"Density input band ({density[1]}) could not be opened")
         if b_depth is None:
             failed = True
-            self.error_messages.append(
+            self._add_error(
                 f"Depth input band ({depth[1]}) could not be opened")
         if b_uncertainty is None:
             failed = True
-            self.error_messages.append(
+            self._add_error(
                 f"Uncertainty input band ({uncertainty[1]}) could not be opened")
 
         failed_datatype = not self._validate_datatypes(
             b_density, b_depth, b_uncertainty)
 
         if failed or failed_datatype:
+            self._complete(False)
             return False
 
         # we've already confirmed that all input files have the same size, so
@@ -255,9 +288,23 @@ class GridTransformer:
             tile_size_y)
 
         for i, tile in enumerate(tiles):
+            if is_stopped is not None and is_stopped():
+                self._add_warning(
+                    "Grid Transformer was stopped during generation of output "
+                    "file. Output will be incomplete.")
+                self._complete(False)
+                return False
+
             bd_density = self._get_tile_data(tile, b_density)
             bd_depth = self._get_tile_data(tile, b_depth)
             bd_uncertainty = self._get_tile_data(tile, b_uncertainty)
+
+            if is_stopped is not None and is_stopped():
+                self._add_warning(
+                    "Grid Transformer was stopped during generation of output "
+                    "file. Output will be incomplete.")
+                self._complete(False)
+                return False
 
             b_output_density.WriteRaster(
                 tile.min_x, tile.min_y,
@@ -290,4 +337,5 @@ class GridTransformer:
             pcb(i / len(tiles))
 
         pcb(1.0)
+        self._complete(True)
         return True
