@@ -1,8 +1,10 @@
 from osgeo import gdal, osr, gdal_array
-from typing import Tuple, NoReturn, Callable
+from typing import Tuple, NoReturn, Callable, List
 import numpy as np
 
 from .tiling import get_tiles, Tile
+
+gdal.SetCacheMax(1000000000)
 
 
 def _default_progress_callback(progress):
@@ -124,19 +126,47 @@ class GridTransformer:
         bs = depth.GetBlockSize()
         return (bs[0], bs[1])
 
+    def _raise_message(self, message):
+        if self.message_callback is not None:
+            self.message_callback(message)
+
     def _add_warning(self, message):
         self.warning_messages.append(message)
-        if self.message_callback is not None:
-            self.message_callback("WARNING: " + message)
+        self._raise_message("WARNING: " + message)
 
     def _add_error(self, message):
         self.error_messages.append(message)
-        if self.message_callback is not None:
-            self.message_callback("ERROR: " + message)
+        self._raise_message("ERROR: " + message)
 
     def _complete(self, successful: bool):
         if self.completed_callback is not None:
             self.completed_callback(successful)
+
+    def _output_dataset_options(
+            self,
+            tile_size_x: int,
+            tile_size_y: int) -> List[str]:
+        ''' Gets a list of creation options for the output dataset. This
+        includes compression and block size '''
+        options = ['COMPRESS=DEFLATE']
+        if tile_size_y == 1:
+            # then input is striped, so write out a striped file
+            self._raise_message(
+                "Input dataset is striped, striped "
+                f"output will be produced. Block size of {tile_size_x} "
+                f"x {tile_size_y}")
+        else:
+            # assume it is tiled and preserve output tile (block) size
+            options.extend([
+                f"BLOCKXSIZE={tile_size_x}",
+                f"BLOCKYSIZE={tile_size_y}",
+                "TILED=YES"
+            ])
+            self._raise_message(
+                "Input dataset is tiled, tiled "
+                "output will be produced using a block size of "
+                f"{tile_size_x} x {tile_size_y}")
+        return options
 
     def process(
             self,
@@ -251,6 +281,9 @@ class GridTransformer:
         projection = ds_depth.GetProjection()
         geotransform = ds_depth.GetGeoTransform()
 
+        tile_size_x, tile_size_y = self._get_block_size(
+            b_density, b_depth, b_uncertainty)
+
         # create output dataset with 3 bands
         ds_output: gdal.Dataset = gdal.GetDriverByName('GTiff').Create(
             output,
@@ -258,7 +291,7 @@ class GridTransformer:
             size_y,
             3,
             self.output_datatype,
-            options=['COMPRESS=DEFLATE']
+            options=self._output_dataset_options(tile_size_x, tile_size_y)
         )
         ds_output.SetProjection(projection)
         ds_output.SetGeoTransform(geotransform)
@@ -275,9 +308,6 @@ class GridTransformer:
         b_output_uncertainty: gdal.Band = ds_output.GetRasterBand(3)
         b_output_uncertainty.SetDescription("uncertainty")
         b_output_uncertainty.SetNoDataValue(self.output_nodata)
-
-        tile_size_x, tile_size_y = self._get_block_size(
-            b_density, b_depth, b_uncertainty)
 
         tiles = get_tiles(
             0,
@@ -313,8 +343,6 @@ class GridTransformer:
                 tile.width, tile.height,
                 self.output_datatype
             )
-            b_output_density.FlushCache()
-
             b_output_depth.WriteRaster(
                 tile.min_x, tile.min_y,
                 tile.width, tile.height,
@@ -322,8 +350,6 @@ class GridTransformer:
                 tile.width, tile.height,
                 self.output_datatype
             )
-            b_output_depth.FlushCache()
-
             b_output_uncertainty.WriteRaster(
                 tile.min_x, tile.min_y,
                 tile.width, tile.height,
@@ -331,10 +357,13 @@ class GridTransformer:
                 tile.width, tile.height,
                 self.output_datatype
             )
-            b_output_uncertainty.FlushCache()
 
             # update the progress callback
             pcb(i / len(tiles))
+
+        b_output_density.FlushCache()
+        b_output_depth.FlushCache()
+        b_output_uncertainty.FlushCache()
 
         pcb(1.0)
         self._complete(True)
