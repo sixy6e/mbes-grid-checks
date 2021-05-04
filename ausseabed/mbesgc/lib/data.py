@@ -9,6 +9,7 @@ from osgeo import gdal
 from typing import Tuple, List, Type
 import os
 import os.path
+from pathlib import Path
 
 from ausseabed.qajson.model import QajsonCheck, QajsonRoot, \
     QajsonParam, QajsonQa, QajsonDataLevel, QajsonInfo, QajsonGroup, \
@@ -62,6 +63,17 @@ class InputFileDetails:
             return None
         else:
             return band_details[0], band_details[1]
+
+    def get_filename(self) -> str:
+        ''' Gets the filename (no extension or full path) of from the band
+        information.
+        '''
+        if len(self.input_band_details) == 0:
+            return None
+        else:
+            input_file, _, _ = self.input_band_details[0]
+            fn = Path(input_file).stem
+            return fn
 
     def __repr__(self):
         bd = [f'  {fn} {bi} {bt}' for (fn, bi, bt) in self.input_band_details]

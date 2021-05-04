@@ -6,10 +6,12 @@ from typing import Optional, Dict, List, Any
 from osgeo import gdal
 import numpy as np
 import numpy.ma as ma
+import os
 
 from .check_utils import get_check
 from .data import InputFileDetails, BandType
 from .tiling import get_tiles, Tile
+from .gridcheck import GridCheck
 
 
 class Executor:
@@ -26,6 +28,10 @@ class Executor:
         # used to store the results of each check as the checks are run
         # across multiple tiles
         self.check_result_cache = {}
+
+        self.spatial_export = False
+        self.spatial_export_location = None
+        self.spatial_qajson = True
 
     def _load_band_tile(self, filename: str, band_index: int, tile: Tile):
         src_ds = gdal.Open(filename)
@@ -69,6 +75,15 @@ class Executor:
 
         return (depth_data, density_data, uncertainty_data)
 
+    def _get_output_file_location(
+            self,
+            ifd: InputFileDetails,
+            check: GridCheck) -> str:
+        if self.spatial_export_location is None:
+            return None
+        check_path = os.path.join(ifd.get_filename(), check.name)
+        return os.path.join(self.spatial_export_location, check_path)
+
     def _run_checks(
         self,
         ifd: InputFileDetails,
@@ -92,6 +107,11 @@ class Executor:
                 # so skip and move on
                 continue
             check = check_class(check_params)
+
+            check.spatial_export = self.spatial_export
+            check.spatial_export_location = self._get_output_file_location(
+                ifd, check)
+            check.spatial_qajson = self.spatial_qajson
 
             check.check_started()
             check.run(

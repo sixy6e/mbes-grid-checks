@@ -4,6 +4,10 @@ Definition of Grid Checks implemented in mbesgc
 from __future__ import annotations
 from datetime import datetime
 from enum import Enum
+from pathlib import PurePath
+from tempfile import TemporaryDirectory
+import distutils
+from distutils import dir_util
 from typing import Optional, Dict, List, Any
 from ausseabed.qajson.model import QajsonParam, QajsonOutputs, QajsonExecution
 from .data import InputFileDetails
@@ -12,6 +16,8 @@ from .tiling import Tile
 import collections
 import numpy as np
 import numpy.ma as ma
+import os
+import shutil
 import scipy.ndimage as ndimage
 import geojson
 from geojson import MultiPolygon
@@ -29,6 +35,7 @@ class GridCheckResult:
     '''
     Encapsulates the various outputs from a grid check
     '''
+
     def __init__(
             self,
             state: GridCheckState,
@@ -54,16 +61,48 @@ class GridCheck:
         # any error messages that occured during running of the check
         self.error_message = None
 
+        self.spatial_export = False
+        self.spatial_export_location = None
+        self.spatial_qajson = True
+
+        self.temp_dir = None
+        self.temp_base_dir = None
+        self.temp_dir_all = []
+
     def check_started(self):
         '''
         to be called before first call to checkc `run` function. Initialises
         the check
         '''
+        if self.spatial_export_location is not None and self.spatial_export:
+            # create a temp folder to keep all the tiled chunks of data
+            p = PurePath(self.spatial_export_location)
+            self.temp_dir = TemporaryDirectory()
+            d = os.path.join(self.temp_dir.name, p.parent.name)
+            d = os.path.join(d, p.name)
+            if not os.path.exists(d):
+                os.makedirs(d)
+            self.temp_base_dir = d
+            self.temp_dir_all.append(self.temp_dir)
+
         if self.start_time is None:
             # only set the start time if the start_time is None, as this
             # function may be called multiple times as each tile is processed
             self.start_time = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
         self.execution_status = 'running'
+
+    def _merge_temp_dirs(self, last_check: GridCheck):
+        self.temp_dir_all.extend(last_check.temp_dir_all)
+
+    def _get_tmp_file(self, name: str, extension: str, tile: Tile) -> str:
+        n = f"{name}_{tile.min_x}_{tile.min_y}.{extension}"
+        return os.path.join(self.temp_base_dir, n)
+
+    def _move_tmp_dir(self):
+        distutils.dir_util.copy_tree(
+            self.temp_base_dir,
+            self.spatial_export_location)
+        # shutil.copy(self.temp_base_dir, self.spatial_export_location)
 
     def check_ended(self):
         '''

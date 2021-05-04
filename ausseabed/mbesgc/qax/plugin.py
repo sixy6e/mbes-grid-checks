@@ -88,6 +88,11 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
 
         self.exe = Executor(ifd_list, all_checks)
 
+        # set options coming from QAX
+        self.exe.spatial_qajson = self.spatial_outputs_qajson
+        self.exe.spatial_export = self.spatial_outputs_export
+        self.exe.spatial_export_location = self.spatial_outputs_export_location
+
         # the check_runner callback accepts only a float, whereas the qax
         # qwax plugin check tool callback requires a referece to a check tool
         # AND a progress value. Hence this little mapping function,
