@@ -83,93 +83,142 @@ class DensityCheck(GridCheck):
 
         self.density_histogram = hist
 
+        if not (self.spatial_export or self.spatial_export_location):
+            # if we don't generate spatial outputs, then there's no
+            # need to do any further processing
+            return
+
         bad_cells_mask = density < self._min_spn
         bad_cells_mask.fill_value = False
         bad_cells_mask = bad_cells_mask.filled()
         bad_cells_mask_int8 = bad_cells_mask.astype(np.int8)
-
-        # grow out failed pixels to make them more obvious. We've already
-        # calculated the pass/fail stats so this won't impact results.
-        bad_cells_mask_int8 = self._grow_pixels(
-            bad_cells_mask_int8, self.pixel_growth)
-
-        # simplify distance is calculated as the distance pixels are grown out
-        # `ifd.geotransform[1]` is pixel size
-        simplify_distance = self.pixel_growth * ifd.geotransform[1]
 
         src_affine = Affine.from_gdal(*ifd.geotransform)
         tile_affine = src_affine * Affine.translation(
             tile.min_x,
             tile.min_y
         )
-        tile_ds = gdal.GetDriverByName('MEM').Create(
-            '',
-            tile.max_x - tile.min_x,
-            tile.max_y - tile.min_y,
-            1,
-            gdal.GDT_Byte
-        )
-        # tf = '/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/t.tif'
-        # tile_ds = gdal.GetDriverByName('GTiff').Create(
-        #     tf,
-        #     tile.max_x - tile.min_x,
-        #     tile.max_y - tile.min_y,
-        #     1,
-        #     gdal.GDT_Byte
-        # )
-        tile_ds.SetGeoTransform(tile_affine.to_gdal())
 
-        tile_band = tile_ds.GetRasterBand(1)
-        tile_band.WriteArray(bad_cells_mask_int8, 0, 0)
-        tile_band.SetNoDataValue(0)
-        tile_band.FlushCache()
-        tile_ds.SetProjection(ifd.projection)
-
-        # dst_layername = "POLYGONIZED_STUFF"
-        # drv = ogr.GetDriverByName("ESRI Shapefile")
-        # dst_ds = drv.CreateDataSource(tf + ".shp")
-        # dst_layer = dst_ds.CreateLayer(dst_layername, srs = None )
-        ogr_srs = osr.SpatialReference()
-        ogr_srs.ImportFromWkt(ifd.projection)
-
-        ogr_driver = ogr.GetDriverByName('Memory')
-        ogr_dataset = ogr_driver.CreateDataSource('shapemask')
-        ogr_layer = ogr_dataset.CreateLayer('shapemask', srs=ogr_srs)
-
-        # used the input raster data 'tile_band' as the input and mask, if not
-        # used as a mask then a feature that outlines the entire dataset is
-        # also produced
-        gdal.Polygonize(
-            tile_band,
-            tile_band,
-            ogr_layer,
-            -1,
-            [],
-            callback=None
-        )
-
-        ogr_simple_driver = ogr.GetDriverByName('Memory')
-        ogr_simple_dataset = ogr_simple_driver.CreateDataSource('failed_poly')
-        ogr_simple_layer = ogr_simple_dataset.CreateLayer(
-            'failed_poly', srs=None)
-
-        self._simplify_layer(ogr_layer, ogr_simple_layer, simplify_distance)
-
-        ogr_srs_out = osr.SpatialReference()
-        ogr_srs_out.ImportFromEPSG(4326)
-        transform = osr.CoordinateTransformation(ogr_srs, ogr_srs_out)
-
-        for feature in ogr_simple_layer:
-            transformed = feature.GetGeometryRef()
-            transformed.Transform(transform)
-
-            geojson_feature = geojson.loads(feature.ExportToJson())
-            self.tiles_geojson.coordinates.extend(
-                geojson_feature.geometry.coordinates
+        # there are similarities in how the qajson spatial outputs are generated
+        # and how the exported files are generated, however as it is possible
+        # to generate both there's not a lot of common steps we can share. Hence
+        # theres a bit of duplication; unfortunately duplication in code AND
+        # processing.
+        if self.spatial_qajson:
+            tile_ds = gdal.GetDriverByName('MEM').Create(
+                '',
+                tile.max_x - tile.min_x,
+                tile.max_y - tile.min_y,
+                1,
+                gdal.GDT_Byte
             )
 
-        ogr_simple_dataset.Destroy()
-        ogr_dataset.Destroy()
+            # grow out failed pixels to make them more obvious. We've already
+            # calculated the pass/fail stats so this won't impact results.
+            bad_cells_mask_int8_grow = self._grow_pixels(
+                bad_cells_mask_int8, self.pixel_growth)
+
+            # simplify distance is calculated as the distance pixels are grown out
+            # `ifd.geotransform[1]` is pixel size
+            simplify_distance = self.pixel_growth * ifd.geotransform[1]
+
+            tile_ds.SetGeoTransform(tile_affine.to_gdal())
+
+            tile_band = tile_ds.GetRasterBand(1)
+            tile_band.WriteArray(bad_cells_mask_int8_grow, 0, 0)
+            tile_band.SetNoDataValue(0)
+            tile_band.FlushCache()
+            tile_ds.SetProjection(ifd.projection)
+
+            ogr_srs = osr.SpatialReference()
+            ogr_srs.ImportFromWkt(ifd.projection)
+
+            ogr_driver = ogr.GetDriverByName('Memory')
+            ogr_dataset = ogr_driver.CreateDataSource('shapemask')
+            ogr_layer = ogr_dataset.CreateLayer('shapemask', srs=ogr_srs)
+
+            # used the input raster data 'tile_band' as the input and mask, if not
+            # used as a mask then a feature that outlines the entire dataset is
+            # also produced
+            gdal.Polygonize(
+                tile_band,
+                tile_band,
+                ogr_layer,
+                -1,
+                [],
+                callback=None
+            )
+
+            ogr_simple_driver = ogr.GetDriverByName('Memory')
+            ogr_simple_dataset = ogr_simple_driver.CreateDataSource(
+                'failed_poly')
+            ogr_simple_layer = ogr_simple_dataset.CreateLayer(
+                'failed_poly', srs=None)
+
+            self._simplify_layer(
+                ogr_layer,
+                ogr_simple_layer,
+                simplify_distance)
+
+            ogr_srs_out = osr.SpatialReference()
+            ogr_srs_out.ImportFromEPSG(4326)
+            transform = osr.CoordinateTransformation(ogr_srs, ogr_srs_out)
+
+            for feature in ogr_simple_layer:
+                transformed = feature.GetGeometryRef()
+                transformed.Transform(transform)
+
+                geojson_feature = geojson.loads(feature.ExportToJson())
+                self.tiles_geojson.coordinates.extend(
+                    geojson_feature.geometry.coordinates
+                )
+
+            ogr_simple_dataset.Destroy()
+            ogr_dataset.Destroy()
+
+        if self.spatial_export:
+            tf = self._get_tmp_file('density_failed', 'tif', tile)
+            tile_ds = gdal.GetDriverByName('GTiff').Create(
+                tf,
+                tile.max_x - tile.min_x,
+                tile.max_y - tile.min_y,
+                1,
+                gdal.GDT_Byte,
+                options=['COMPRESS=DEFLATE']
+            )
+
+            tile_ds.SetGeoTransform(tile_affine.to_gdal())
+
+            tile_band = tile_ds.GetRasterBand(1)
+            tile_band.WriteArray(bad_cells_mask_int8, 0, 0)
+            tile_band.SetNoDataValue(0)
+            tile_band.FlushCache()
+            tile_ds.SetProjection(ifd.projection)
+
+            ogr_srs = osr.SpatialReference()
+            ogr_srs.ImportFromWkt(ifd.projection)
+
+            sf = self._get_tmp_file('density_failed', 'shp', tile)
+            ogr_driver = ogr.GetDriverByName("ESRI Shapefile")
+            ogr_dataset = ogr_driver.CreateDataSource(sf)
+            ogr_layer = ogr_dataset.CreateLayer('density_failed', srs=ogr_srs)
+
+            # used the input raster data 'tile_band' as the input and mask, if not
+            # used as a mask then a feature that outlines the entire dataset is
+            # also produced
+            gdal.Polygonize(
+                tile_band,
+                tile_band,
+                ogr_layer,
+                -1,
+                [],
+                callback=None
+            )
+
+            tile_ds = None
+            ogr_dataset.Destroy()
+
+            self._move_tmp_dir()
 
         # # includes only the tile boundaries, used for debug
         # tile_geojson = tile.to_geojson(ifd.projection, ifd.geotransform)
@@ -190,6 +239,8 @@ class DensityCheck(GridCheck):
         self.tiles_geojson.coordinates.extend(
             last_check.tiles_geojson.coordinates
         )
+
+        self._merge_temp_dirs(last_check)
 
     def get_outputs(self) -> QajsonOutputs:
 
@@ -264,7 +315,8 @@ class DensityCheck(GridCheck):
             'data': str_key_counts
         }
 
-        data['map'] = self.tiles_geojson
+        if self.spatial_qajson:
+            data['map'] = self.tiles_geojson
 
         result = QajsonOutputs(
             execution=execution,
@@ -319,6 +371,8 @@ class TvuCheck(GridCheck):
             last_check.tiles_geojson.coordinates
         )
 
+        self._merge_temp_dirs(last_check)
+
     def run(
             self,
             ifd: InputFileDetails,
@@ -351,122 +405,166 @@ class TvuCheck(GridCheck):
 
         # count of cells that failed the check
         self.failed_cell_count = int(failed_uncertainty.sum())
-        # fraction_failed = failed_cell_count / total_cell_count
-        # print(f"total = {total_cell_count}")
-        # print(f"failed_cell_count = {failed_cell_count}")
-        # print(f"fraction_failed = {fraction_failed}")
 
-        # grow out failed pixels to make them more obvious. We've already
-        # calculated the pass/fail stats so this won't impact results.
-        failed_uncertainty_int8 = self._grow_pixels(
-            failed_uncertainty_int8, self.pixel_growth)
-
-        # simplify distance is calculated as the distance pixels are grown out
-        # `ifd.geotransform[1]` is pixel size
-        simplify_distance = self.pixel_growth * ifd.geotransform[1]
+        if not (self.spatial_export or self.spatial_export_location):
+            # if we don't generate spatial outputs, then there's no
+            # need to do any further processing
+            return
 
         src_affine = Affine.from_gdal(*ifd.geotransform)
         tile_affine = src_affine * Affine.translation(
             tile.min_x,
             tile.min_y
         )
-        # tf = '/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/au2.tif'
-        # tile_ds = gdal.GetDriverByName('GTiff').Create(
-        #     tf,
-        #     tile.max_x - tile.min_x,
-        #     tile.max_y - tile.min_y,
-        #     1,
-        #     gdal.GDT_Float32
-        # )
-        tile_ds = gdal.GetDriverByName('MEM').Create(
-            '',
-            tile.max_x - tile.min_x,
-            tile.max_y - tile.min_y,
-            1,
-            gdal.GDT_Float32
-        )
-        tile_ds.SetGeoTransform(tile_affine.to_gdal())
 
-        tile_band = tile_ds.GetRasterBand(1)
-        tile_band.WriteArray(allowable_uncertainty, 0, 0)
-        tile_band.SetNoDataValue(0)
-        tile_band.FlushCache()
-        tile_ds.SetProjection(ifd.projection)
-        #
-        # tf2 = '/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/fu.tif'
-        # tile_failed_ds = gdal.GetDriverByName('GTiff').Create(
-        #     tf2,
-        #     tile.max_x - tile.min_x,
-        #     tile.max_y - tile.min_y,
-        #     1,
-        #     gdal.GDT_Byte
-        # )
-        tile_failed_ds = gdal.GetDriverByName('MEM').Create(
-            '',
-            tile.max_x - tile.min_x,
-            tile.max_y - tile.min_y,
-            1,
-            gdal.GDT_Byte
-        )
-        tile_failed_ds.SetGeoTransform(tile_affine.to_gdal())
-
-        tile_failed_band = tile_failed_ds.GetRasterBand(1)
-        tile_failed_band.WriteArray(failed_uncertainty_int8, 0, 0)
-        tile_failed_band.SetNoDataValue(0)
-        tile_failed_band.FlushCache()
-        tile_failed_ds.SetProjection(ifd.projection)
-
-        # dst_layername = "POLYGONIZED_STUFF"
-        # drv = ogr.GetDriverByName("ESRI Shapefile")
-        # dst_ds = drv.CreateDataSource(tf + ".shp")
-        # dst_layer = dst_ds.CreateLayer(dst_layername, srs = None )
         ogr_srs = osr.SpatialReference()
         ogr_srs.ImportFromWkt(ifd.projection)
 
-        ogr_driver = ogr.GetDriverByName('Memory')
-        ogr_dataset = ogr_driver.CreateDataSource('shapemask')
-        ogr_layer = ogr_dataset.CreateLayer('shapemask', srs=ogr_srs)
+        # see notes on density check for more details on the processing performed
+        # below
+        if self.spatial_qajson:
+            # grow out failed pixels to make them more obvious. We've already
+            # calculated the pass/fail stats so this won't impact results.
+            failed_uncertainty_int8_grow = self._grow_pixels(
+                failed_uncertainty_int8, self.pixel_growth)
 
-        # ogr_driver = ogr.GetDriverByName("ESRI Shapefile")
-        # ogr_dataset = ogr_driver.CreateDataSource(tf2 + "_2.shp")
-        # ogr_layer = ogr_dataset.CreateLayer("failed_poly", srs=None)
+            # simplify distance is calculated as the distance pixels are grown out
+            # `ifd.geotransform[1]` is pixel size
+            simplify_distance = self.pixel_growth * ifd.geotransform[1]
 
-        # used the input raster data 'tile_band' as the input and mask, if not
-        # used as a mask then a feature that outlines the entire dataset is
-        # also produced
-        gdal.Polygonize(
-            tile_failed_band,
-            tile_failed_band,
-            ogr_layer,
-            -1,
-            [],
-            callback=None
-        )
+            tile_ds = gdal.GetDriverByName('MEM').Create(
+                '',
+                tile.max_x - tile.min_x,
+                tile.max_y - tile.min_y,
+                1,
+                gdal.GDT_Float32
+            )
+            tile_ds.SetGeoTransform(tile_affine.to_gdal())
 
-        ogr_simple_driver = ogr.GetDriverByName('Memory')
-        ogr_simple_dataset = ogr_simple_driver.CreateDataSource('failed_poly')
-        ogr_simple_layer = ogr_simple_dataset.CreateLayer(
-            'failed_poly', srs=None)
+            tile_band = tile_ds.GetRasterBand(1)
+            tile_band.WriteArray(allowable_uncertainty, 0, 0)
+            tile_band.SetNoDataValue(0)
+            tile_band.FlushCache()
+            tile_ds.SetProjection(ifd.projection)
 
-        self._simplify_layer(ogr_layer, ogr_simple_layer, simplify_distance)
+            tile_failed_ds = gdal.GetDriverByName('MEM').Create(
+                '',
+                tile.max_x - tile.min_x,
+                tile.max_y - tile.min_y,
+                1,
+                gdal.GDT_Byte
+            )
+            tile_failed_ds.SetGeoTransform(tile_affine.to_gdal())
 
-        ogr_srs_out = osr.SpatialReference()
-        ogr_srs_out.ImportFromEPSG(4326)
-        transform = osr.CoordinateTransformation(ogr_srs, ogr_srs_out)
+            tile_failed_band = tile_failed_ds.GetRasterBand(1)
+            tile_failed_band.WriteArray(failed_uncertainty_int8_grow, 0, 0)
+            tile_failed_band.SetNoDataValue(0)
+            tile_failed_band.FlushCache()
+            tile_failed_ds.SetProjection(ifd.projection)
 
-        for feature in ogr_simple_layer:
-            # transform feature into epsg:4326 before export to geojson
-            transformed = feature.GetGeometryRef()
-            transformed.Transform(transform)
+            ogr_driver = ogr.GetDriverByName('Memory')
+            ogr_dataset = ogr_driver.CreateDataSource('shapemask')
+            ogr_layer = ogr_dataset.CreateLayer('shapemask', srs=ogr_srs)
 
-            geojson_feature = geojson.loads(feature.ExportToJson())
-
-            self.tiles_geojson.coordinates.extend(
-                geojson_feature.geometry.coordinates
+            # used the input raster data 'tile_band' as the input and mask, if not
+            # used as a mask then a feature that outlines the entire dataset is
+            # also produced
+            gdal.Polygonize(
+                tile_failed_band,
+                tile_failed_band,
+                ogr_layer,
+                -1,
+                [],
+                callback=None
             )
 
-        ogr_simple_dataset.Destroy()
-        ogr_dataset.Destroy()
+            ogr_simple_driver = ogr.GetDriverByName('Memory')
+            ogr_simple_dataset = ogr_simple_driver.CreateDataSource(
+                'failed_poly')
+            ogr_simple_layer = ogr_simple_dataset.CreateLayer(
+                'failed_poly', srs=None)
+
+            self._simplify_layer(
+                ogr_layer,
+                ogr_simple_layer,
+                simplify_distance)
+
+            ogr_srs_out = osr.SpatialReference()
+            ogr_srs_out.ImportFromEPSG(4326)
+            transform = osr.CoordinateTransformation(ogr_srs, ogr_srs_out)
+
+            for feature in ogr_simple_layer:
+                # transform feature into epsg:4326 before export to geojson
+                transformed = feature.GetGeometryRef()
+                transformed.Transform(transform)
+
+                geojson_feature = geojson.loads(feature.ExportToJson())
+
+                self.tiles_geojson.coordinates.extend(
+                    geojson_feature.geometry.coordinates
+                )
+
+            ogr_simple_dataset.Destroy()
+            ogr_dataset.Destroy()
+
+        if self.spatial_export:
+            au = self._get_tmp_file('allowable_uncertainty', 'tif', tile)
+            tile_ds = gdal.GetDriverByName('GTiff').Create(
+                au,
+                tile.max_x - tile.min_x,
+                tile.max_y - tile.min_y,
+                1,
+                gdal.GDT_Float32,
+                options=['COMPRESS=DEFLATE']
+            )
+            tile_ds.SetGeoTransform(tile_affine.to_gdal())
+
+            tile_band = tile_ds.GetRasterBand(1)
+            tile_band.WriteArray(allowable_uncertainty, 0, 0)
+            tile_band.SetNoDataValue(0)
+            tile_band.FlushCache()
+            tile_ds.SetProjection(ifd.projection)
+
+            tf = self._get_tmp_file('failed_uncertainty', 'tif', tile)
+            tile_failed_ds = gdal.GetDriverByName('GTiff').Create(
+                tf,
+                tile.max_x - tile.min_x,
+                tile.max_y - tile.min_y,
+                1,
+                gdal.GDT_Byte,
+                options=['COMPRESS=DEFLATE']
+            )
+            tile_failed_ds.SetGeoTransform(tile_affine.to_gdal())
+
+            tile_failed_band = tile_failed_ds.GetRasterBand(1)
+            tile_failed_band.WriteArray(failed_uncertainty_int8, 0, 0)
+            tile_failed_band.SetNoDataValue(0)
+            tile_failed_band.FlushCache()
+            tile_failed_ds.SetProjection(ifd.projection)
+
+            sf = self._get_tmp_file('failed_uncertainty', 'shp', tile)
+            ogr_driver = ogr.GetDriverByName("ESRI Shapefile")
+            ogr_dataset = ogr_driver.CreateDataSource(sf)
+            ogr_layer = ogr_dataset.CreateLayer(
+                'failed_uncertainty', srs=ogr_srs)
+
+            # used the input raster data 'tile_band' as the input and mask, if not
+            # used as a mask then a feature that outlines the entire dataset is
+            # also produced
+            gdal.Polygonize(
+                tile_failed_band,
+                tile_failed_band,
+                ogr_layer,
+                -1,
+                [],
+                callback=None
+            )
+
+            tile_ds = None
+            tile_failed_ds = None
+            ogr_dataset.Destroy()
+
+            self._move_tmp_dir()
 
     def get_outputs(self) -> QajsonOutputs:
 
@@ -483,7 +581,8 @@ class TvuCheck(GridCheck):
             "fraction_failed": self.failed_cell_count / self.total_cell_count,
         }
 
-        data['map'] = self.tiles_geojson
+        if self.spatial_qajson:
+            data['map'] = self.tiles_geojson
 
         if self.failed_cell_count > 0:
             percent_failed = (
@@ -540,11 +639,11 @@ class ResolutionCheck(GridCheck):
 
     # default values taken from IHO - 1a spec
     input_params = [
-        QajsonParam("Feature Detection Size Multiplier", 1.0),
+        QajsonParam("Feature Detection Size Multiplier", 0.5),
         QajsonParam("Threshold Depth", 40.0),
         QajsonParam("Above Threshold FDS Depth Multiplier", 0.0),
         QajsonParam("Above Threshold FDS Depth Constant", 2.0),
-        QajsonParam("Below Threshold FDS Depth Multiplier", 0.025),
+        QajsonParam("Below Threshold FDS Depth Multiplier", 0.05),
         QajsonParam("Below Threshold FDS Depth Constant", 0.0)
     ]
 
@@ -584,6 +683,8 @@ class ResolutionCheck(GridCheck):
             last_check.tiles_geojson.coordinates
         )
 
+        self._merge_temp_dirs(last_check)
+
     def run(
             self,
             ifd: InputFileDetails,
@@ -622,16 +723,13 @@ class ResolutionCheck(GridCheck):
         )
 
         fds = np.ma.masked_where(np.ma.getmask(depth), fds)
-
-        # easier to calc a feature size from a single grid resolution and the
-        # FDS multiplier than to rescale the whole fds array
-        feature_size = self.grid_resolution / self._fds_multiplier
+        allowable_grid_size = fds * self._fds_multiplier
 
         # The idea of the standard here is that the deeper the water gets the
         # less ability you have to pick up features on the seafloor and also
         # features become less important the deeper the water gets as under
         # keel clearance for ships becomes less of an issue.
-        failed_resolution = fds < feature_size
+        failed_resolution = allowable_grid_size < self.grid_resolution
 
         failed_resolution.fill_value = False
         failed_resolution = failed_resolution.filled()
@@ -639,19 +737,11 @@ class ResolutionCheck(GridCheck):
 
         # count of cells that failed the check
         self.failed_cell_count = int(failed_resolution.sum())
-        # fraction_failed = failed_cell_count / total_cell_count
-        # print(f"total = {total_cell_count}")
-        # print(f"failed_cell_count = {failed_cell_count}")
-        # print(f"fraction_failed = {fraction_failed}")
 
-        # grow out failed pixels to make them more obvious. We've already
-        # calculated the pass/fail stats so this won't impact results.
-        failed_resolution_int8 = self._grow_pixels(
-            failed_resolution_int8, self.pixel_growth)
-
-        # simplify distance is calculated as the distance pixels are grown out
-        # `ifd.geotransform[1]` is pixel size
-        simplify_distance = self.pixel_growth * ifd.geotransform[1]
+        if not (self.spatial_export or self.spatial_export_location):
+            # if we don't generate spatial outputs, then there's no
+            # need to do any further processing
+            return
 
         src_affine = Affine.from_gdal(*ifd.geotransform)
         tile_affine = src_affine * Affine.translation(
@@ -659,109 +749,142 @@ class ResolutionCheck(GridCheck):
             tile.min_y
         )
 
-        # Switch from a masked array to an array with a nodata value, this allows
-        # us to include nodata in the gdal output.
-        # fds.fill_value = -9999.0
-        # fds = fds.filled()
-
-        # tf = '/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/au2.tif'
-        # tile_ds = gdal.GetDriverByName('GTiff').Create(
-        #     tf,
-        #     tile.max_x - tile.min_x,
-        #     tile.max_y - tile.min_y,
-        #     1,
-        #     gdal.GDT_Float32
-        # )
-        # tild_ds was only ever used to support debugging
-        # tile_ds = gdal.GetDriverByName('MEM').Create(
-        #     '',
-        #     tile.max_x - tile.min_x,
-        #     tile.max_y - tile.min_y,
-        #     1,
-        #     gdal.GDT_Float32
-        # )
-        # tile_ds.SetGeoTransform(tile_affine.to_gdal())
-
-        # tile_band = tile_ds.GetRasterBand(1)
-        # tile_band.WriteArray(fds, 0, 0)
-        # tile_band.SetNoDataValue(-9999.0)
-        # tile_band.FlushCache()
-        # tile_ds.SetProjection(ifd.projection)
-
-        # tf2 = '/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/fu.tif'
-        # tile_failed_ds = gdal.GetDriverByName('GTiff').Create(
-        #     tf2,
-        #     tile.max_x - tile.min_x,
-        #     tile.max_y - tile.min_y,
-        #     1,
-        #     gdal.GDT_Byte
-        # )
-        tile_failed_ds = gdal.GetDriverByName('MEM').Create(
-            '',
-            tile.max_x - tile.min_x,
-            tile.max_y - tile.min_y,
-            1,
-            gdal.GDT_Byte
-        )
-        tile_failed_ds.SetGeoTransform(tile_affine.to_gdal())
-
-        tile_failed_band = tile_failed_ds.GetRasterBand(1)
-        tile_failed_band.WriteArray(failed_resolution_int8, 0, 0)
-        tile_failed_band.SetNoDataValue(0)
-        tile_failed_band.FlushCache()
-        tile_failed_ds.SetProjection(ifd.projection)
-
-        # dst_layername = "POLYGONIZED_STUFF"
-        # drv = ogr.GetDriverByName("ESRI Shapefile")
-        # dst_ds = drv.CreateDataSource(tf + ".shp")
-        # dst_layer = dst_ds.CreateLayer(dst_layername, srs = None )
         ogr_srs = osr.SpatialReference()
         ogr_srs.ImportFromWkt(ifd.projection)
 
-        ogr_driver = ogr.GetDriverByName('Memory')
-        ogr_dataset = ogr_driver.CreateDataSource('shapemask')
-        ogr_layer = ogr_dataset.CreateLayer('shapemask', srs=ogr_srs)
+        # see notes on density check for more details on the processing performed
+        # below
+        if self.spatial_qajson:
+            # grow out failed pixels to make them more obvious. We've already
+            # calculated the pass/fail stats so this won't impact results.
+            failed_resolution_int8_grow = self._grow_pixels(
+                failed_resolution_int8, self.pixel_growth)
 
-        # ogr_driver = ogr.GetDriverByName("ESRI Shapefile")
-        # ogr_dataset = ogr_driver.CreateDataSource(tf2 + "_2.shp")
-        # ogr_layer = ogr_dataset.CreateLayer("failed_poly", srs=None)
+            # simplify distance is calculated as the distance pixels are grown out
+            # `ifd.geotransform[1]` is pixel size
+            simplify_distance = self.pixel_growth * ifd.geotransform[1]
 
-        # used the input raster data 'tile_band' as the input and mask, if not
-        # used as a mask then a feature that outlines the entire dataset is
-        # also produced
-        gdal.Polygonize(
-            tile_failed_band,
-            tile_failed_band,
-            ogr_layer,
-            -1,
-            [],
-            callback=None
-        )
+            tile_failed_ds = gdal.GetDriverByName('MEM').Create(
+                '',
+                tile.max_x - tile.min_x,
+                tile.max_y - tile.min_y,
+                1,
+                gdal.GDT_Byte
+            )
+            tile_failed_ds.SetGeoTransform(tile_affine.to_gdal())
 
-        ogr_simple_driver = ogr.GetDriverByName('Memory')
-        ogr_simple_dataset = ogr_simple_driver.CreateDataSource('failed_poly')
-        ogr_simple_layer = ogr_simple_dataset.CreateLayer(
-            'failed_poly', srs=None)
+            tile_failed_band = tile_failed_ds.GetRasterBand(1)
+            tile_failed_band.WriteArray(failed_resolution_int8_grow, 0, 0)
+            tile_failed_band.SetNoDataValue(0)
+            tile_failed_band.FlushCache()
+            tile_failed_ds.SetProjection(ifd.projection)
 
-        self._simplify_layer(ogr_layer, ogr_simple_layer, simplify_distance)
+            ogr_driver = ogr.GetDriverByName('Memory')
+            ogr_dataset = ogr_driver.CreateDataSource('shapemask')
+            ogr_layer = ogr_dataset.CreateLayer('shapemask', srs=ogr_srs)
 
-        ogr_srs_out = osr.SpatialReference()
-        ogr_srs_out.ImportFromEPSG(4326)
-        transform = osr.CoordinateTransformation(ogr_srs, ogr_srs_out)
-
-        for feature in ogr_simple_layer:
-            # transform feature into epsg:4326 before export to geojson
-            transformed = feature.GetGeometryRef()
-            transformed.Transform(transform)
-
-            geojson_feature = geojson.loads(feature.ExportToJson())
-
-            self.tiles_geojson.coordinates.extend(
-                geojson_feature.geometry.coordinates
+            # used the input raster data 'tile_band' as the input and mask, if not
+            # used as a mask then a feature that outlines the entire dataset is
+            # also produced
+            gdal.Polygonize(
+                tile_failed_band,
+                tile_failed_band,
+                ogr_layer,
+                -1,
+                [],
+                callback=None
             )
 
-        ogr_simple_dataset.Destroy()
-        ogr_dataset.Destroy()
+            ogr_simple_driver = ogr.GetDriverByName('Memory')
+            ogr_simple_dataset = ogr_simple_driver.CreateDataSource(
+                'failed_poly')
+            ogr_simple_layer = ogr_simple_dataset.CreateLayer(
+                'failed_poly', srs=None)
+
+            self._simplify_layer(
+                ogr_layer,
+                ogr_simple_layer,
+                simplify_distance)
+
+            ogr_srs_out = osr.SpatialReference()
+            ogr_srs_out.ImportFromEPSG(4326)
+            transform = osr.CoordinateTransformation(ogr_srs, ogr_srs_out)
+
+            for feature in ogr_simple_layer:
+                # transform feature into epsg:4326 before export to geojson
+                transformed = feature.GetGeometryRef()
+                transformed.Transform(transform)
+
+                geojson_feature = geojson.loads(feature.ExportToJson())
+
+                self.tiles_geojson.coordinates.extend(
+                    geojson_feature.geometry.coordinates
+                )
+
+            ogr_simple_dataset.Destroy()
+            ogr_dataset.Destroy()
+
+        if self.spatial_export:
+            allowable_grid_size.fill_value = -9999.0
+            allowable_grid_size = allowable_grid_size.filled()
+
+            ar = self._get_tmp_file('allowable_resolution', 'tif', tile)
+            tile_ds = gdal.GetDriverByName('GTiff').Create(
+                ar,
+                tile.max_x - tile.min_x,
+                tile.max_y - tile.min_y,
+                1,
+                gdal.GDT_Float32,
+                options=['COMPRESS=DEFLATE']
+            )
+            tile_ds.SetGeoTransform(tile_affine.to_gdal())
+
+            tile_band = tile_ds.GetRasterBand(1)
+            tile_band.WriteArray(allowable_grid_size, 0, 0)
+            tile_band.SetNoDataValue(-9999.0)
+            tile_band.FlushCache()
+            tile_ds.SetProjection(ifd.projection)
+
+            tf = self._get_tmp_file('failed_resolution', 'tif', tile)
+            tile_failed_ds = gdal.GetDriverByName('GTiff').Create(
+                tf,
+                tile.max_x - tile.min_x,
+                tile.max_y - tile.min_y,
+                1,
+                gdal.GDT_Byte,
+                options=['COMPRESS=DEFLATE']
+            )
+            tile_failed_ds.SetGeoTransform(tile_affine.to_gdal())
+
+            tile_failed_band = tile_failed_ds.GetRasterBand(1)
+            tile_failed_band.WriteArray(failed_resolution_int8, 0, 0)
+            tile_failed_band.SetNoDataValue(0)
+            tile_failed_band.FlushCache()
+            tile_failed_ds.SetProjection(ifd.projection)
+
+            sf = self._get_tmp_file('failed_resolution', 'shp', tile)
+            ogr_driver = ogr.GetDriverByName("ESRI Shapefile")
+            ogr_dataset = ogr_driver.CreateDataSource(sf)
+            ogr_layer = ogr_dataset.CreateLayer(
+                'failed_resolution', srs=ogr_srs)
+
+            # used the input raster data 'tile_band' as the input and mask, if not
+            # used as a mask then a feature that outlines the entire dataset is
+            # also produced
+            gdal.Polygonize(
+                tile_failed_band,
+                tile_failed_band,
+                ogr_layer,
+                -1,
+                [],
+                callback=None
+            )
+
+            tile_ds = None
+            tile_failed_ds = None
+            ogr_dataset.Destroy()
+
+            self._move_tmp_dir()
 
     def get_outputs(self) -> QajsonOutputs:
 
@@ -779,7 +902,8 @@ class ResolutionCheck(GridCheck):
             "grid_resolution": self.grid_resolution
         }
 
-        data['map'] = self.tiles_geojson
+        if self.spatial_qajson:
+            data['map'] = self.tiles_geojson
 
         if self.failed_cell_count > 0:
             percent_failed = (
