@@ -18,9 +18,9 @@ from .gridcheck import GridCheck, GridCheckState, GridCheckResult
 class DensityCheck(GridCheck):
     '''
     Performs check based on density data and input arrays. This looks to
-    determine if each node (grid cell) statisfies a minimum count (the value
+    determine if each node (grid cell) satisfies a minimum count (the value
     stored in the density layer) and whether a percentage of nodes overall
-    satisfy a different minumum count.
+    satisfy a different minimum count.
     '''
 
     id = '5e2afd8a-2ced-4de8-80f5-111c459a7175'
@@ -29,7 +29,7 @@ class DensityCheck(GridCheck):
     input_params = [
         QajsonParam("Minimum Soundings per node", 5),
         QajsonParam("Minimum Soundings per node at percentage", 5),
-        QajsonParam("Minumum Soundings per node percentage", 95.0),
+        QajsonParam("Minimum Soundings per node percentage", 95.0),
     ]
 
     def __init__(self, input_params: List[QajsonParam]):
@@ -41,7 +41,7 @@ class DensityCheck(GridCheck):
         # if a percentage `_min_spn_p` of all nodes is above a threshold
         # `_min_spn_ap` then this check will also fail
         self._min_spn_p = self.get_param(
-            'Minumum Soundings per node percentage')
+            'Minimum Soundings per node percentage')
         self._min_spn_ap = self.get_param(
             'Minimum Soundings per node at percentage')
 
@@ -264,7 +264,7 @@ class DensityCheck(GridCheck):
                 check_state=GridCheckState.cs_fail
             )
 
-        # sort the list of sounding counts and the number of occurances
+        # sort the list of sounding counts and the number of occurrences
         counts = collections.OrderedDict(
             sorted(self.density_histogram.items()))
 
@@ -272,13 +272,13 @@ class DensityCheck(GridCheck):
         data = {}
         check_state = None
 
-        lowest_sounding_count, occurances = next(iter(counts.items()))
+        lowest_sounding_count, occurrences = next(iter(counts.items()))
         if lowest_sounding_count < self._min_spn:
             c = 0
-            for sounding_count, occurances in iter(counts.items()):
+            for sounding_count, occurrences in iter(counts.items()):
                 if sounding_count >= self._min_spn:
                     break
-                c += occurances
+                c += occurrences
             messages.append(
                 f'{c} nodes were found to be under the Minimum Soundings per '
                 f'node setting ({self._min_spn})'
@@ -287,10 +287,10 @@ class DensityCheck(GridCheck):
 
         total_soundings = sum(counts.values())
         under_threshold_soundings = 0
-        for sounding_count, occurances in counts.items():
+        for sounding_count, occurrences in counts.items():
             if sounding_count >= self._min_spn_ap:
                 break
-            under_threshold_soundings += occurances
+            under_threshold_soundings += occurrences
 
         percentage_over_threshold = \
             (1.0 - under_threshold_soundings / total_soundings) * 100.0
