@@ -113,12 +113,12 @@ def _get_tiff_details(input_file):
     ifd.add_band_details(
         input_file,
         1,
-        BandType.density
+        BandType.depth
     )
     ifd.add_band_details(
         input_file,
         2,
-        BandType.depth
+        BandType.density
     )
     ifd.add_band_details(
         input_file,
