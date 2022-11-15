@@ -170,8 +170,8 @@ class GridTransformer:
 
     def process(
             self,
-            density: Tuple[str, int],
             depth: Tuple[str, int],
+            density: Tuple[str, int],
             uncertainty: Tuple[str, int],
             output: str,
             progress_callback: Callable = None,
@@ -183,10 +183,10 @@ class GridTransformer:
         one file containing 3 bands.
 
         Args:
-            density: Tuple(str, int): tuple with full file path and the index of the
-                band containing density data
             depth: Tuple(str, int): tuple with full file path and the index of the
                 band containing depth data
+            density: Tuple(str, int): tuple with full file path and the index of the
+                band containing density data
             uncertainty: Tuple(str, int): tuple with full file path and the index of the
                 band containing uncertainty data
             output: str: full path to the output file that will be created by this
@@ -297,13 +297,13 @@ class GridTransformer:
         ds_output.SetGeoTransform(geotransform)
 
         # bands are indexed from 1
-        b_output_density: gdal.Band = ds_output.GetRasterBand(1)
-        b_output_density.SetDescription("density")
-        b_output_density.SetNoDataValue(self.output_nodata)
-
-        b_output_depth: gdal.Band = ds_output.GetRasterBand(2)
+        b_output_depth: gdal.Band = ds_output.GetRasterBand(1)
         b_output_depth.SetDescription("depth")
         b_output_depth.SetNoDataValue(self.output_nodata)
+
+        b_output_density: gdal.Band = ds_output.GetRasterBand(2)
+        b_output_density.SetDescription("density")
+        b_output_density.SetNoDataValue(self.output_nodata)
 
         b_output_uncertainty: gdal.Band = ds_output.GetRasterBand(3)
         b_output_uncertainty.SetDescription("uncertainty")
@@ -336,17 +336,17 @@ class GridTransformer:
                 self._complete(False)
                 return False
 
-            b_output_density.WriteRaster(
-                tile.min_x, tile.min_y,
-                tile.width, tile.height,
-                bd_density.tobytes(),
-                tile.width, tile.height,
-                self.output_datatype
-            )
             b_output_depth.WriteRaster(
                 tile.min_x, tile.min_y,
                 tile.width, tile.height,
                 bd_depth.tobytes(),
+                tile.width, tile.height,
+                self.output_datatype
+            )
+            b_output_density.WriteRaster(
+                tile.min_x, tile.min_y,
+                tile.width, tile.height,
+                bd_density.tobytes(),
                 tile.width, tile.height,
                 self.output_datatype
             )
@@ -361,8 +361,8 @@ class GridTransformer:
             # update the progress callback
             pcb(i / len(tiles))
 
-        b_output_density.FlushCache()
         b_output_depth.FlushCache()
+        b_output_density.FlushCache()
         b_output_uncertainty.FlushCache()
 
         pcb(1.0)
