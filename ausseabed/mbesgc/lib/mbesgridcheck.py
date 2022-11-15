@@ -28,7 +28,7 @@ class DensityCheck(GridCheck):
     version = '1'
     input_params = [
         QajsonParam("Minimum Soundings per node", 5),
-        QajsonParam("Minimum Soundings per node at percentage", 5),
+        QajsonParam("Minimum Soundings per node at percentage", 9),
         QajsonParam("Minimum Soundings per node percentage", 95.0),
     ]
 
@@ -343,8 +343,8 @@ class TvuCheck(GridCheck):
     name = 'Total Vertical Uncertainty Check'
     version = '1'
     input_params = [
-        QajsonParam("Constant Depth Error", 0.2),
-        QajsonParam("Factor of Depth Dependent Errors", 0.007)
+        QajsonParam("Constant Depth Error", 0.5),
+        QajsonParam("Factor of Depth Dependent Errors", 0.013)
     ]
 
     def __init__(self, input_params: List[QajsonParam]):
