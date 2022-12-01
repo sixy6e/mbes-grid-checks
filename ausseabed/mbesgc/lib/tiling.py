@@ -39,6 +39,7 @@ class Tile:
         src_proj.ImportFromWkt(projection)
         dst_proj = osr.SpatialReference()
         dst_proj.ImportFromEPSG(4326)
+        dst_proj.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
         coord_trans = osr.CoordinateTransformation(src_proj, dst_proj)
 
         coordinates = [
