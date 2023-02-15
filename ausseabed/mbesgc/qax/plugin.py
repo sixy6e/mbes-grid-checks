@@ -1,4 +1,4 @@
-from typing import List, Dict, NoReturn, Callable
+from typing import List, Dict, NoReturn, Callable, Tuple
 from pathlib import Path
 
 
@@ -75,6 +75,30 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
         set_a = set([str(p.path) for p in a.files])
         set_b = set([str(p.path) for p in b.files])
         return set_a == set_b
+
+    def get_summary_details(self) -> List[Tuple[str, str]]:
+        return [
+            ("header", "Number of Nodes"),
+            ("DENSITY", "Number of Nodes with density Fails"),
+            ("DENSITY", r"% of nodes with 5 soundings or greater"),
+        ]
+
+    def get_summary_value(
+            self,
+            field_section: str,
+            field_name: str,
+            filename: str,
+            qajson: QajsonRoot
+        ) -> object:
+        """
+        """
+        checks = self._get_qajson_checks(qajson)
+        file_checks = self._checks_filtered_by_file(filename, checks)
+        if field_section == 'header' and field_name == "Number of Nodes":
+            return "non"
+        else:
+            return 0
+
 
     def run(
             self,
