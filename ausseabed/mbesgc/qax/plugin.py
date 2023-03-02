@@ -79,8 +79,14 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
     def get_summary_details(self) -> List[Tuple[str, str]]:
         return [
             ("header", "Number of Nodes"),
-            ("DENSITY", "Number of Nodes with density Fails"),
+            ("DENSITY", "Number of Nodes with density fails"),
             ("DENSITY", r"% of nodes with 5 soundings or greater"),
+            ("DENSITY", r"100% of nodes on SF"),
+            ("DENSITY", "Density Check comment"),
+            ("UNCERTAINTY", "Number of Nodes with Uncertainty Fails"),
+            ("UNCERTAINTY", r"% of Nodes with  Uncertainty Fails"),
+            ("UNCERTAINTY", "TVU Check comment"),
+            ("RESOLUTION", "Resolution Check QAX Message"),
         ]
 
     def get_summary_value(
@@ -94,8 +100,80 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
         """
         checks = self._get_qajson_checks(qajson)
         file_checks = self._checks_filtered_by_file(filename, checks)
+
+        density_check = None
+        density_checks = self._checks_filtered_by_name(
+            'Density Check',
+            file_checks
+        )
+        # should really only be one
+        if len(density_checks) >= 1:
+            density_check = density_checks[0]
+
+        tvu_check = None
+        tvu_checks = self._checks_filtered_by_name(
+            'Total Vertical Uncertainty Check',
+            file_checks
+        )
+        if len(tvu_checks) >= 1:
+            tvu_check = tvu_checks[0]
+
+        res_check = None
+        res_checks = self._checks_filtered_by_name(
+            'Resolution Check',
+            file_checks
+        )
+        if len(res_checks) >= 1:
+            res_check = res_checks[0]
+
         if field_section == 'header' and field_name == "Number of Nodes":
-            return "non"
+            if density_check:
+                density_data = density_check.outputs.data
+                node_count = 0
+                for _, v in density_data["chart"]["data"].items():
+                    node_count += v
+                print(node_count)
+                return node_count
+            else:
+                return "No density check"
+        elif field_section == 'DENSITY' and field_name == "Number of Nodes with density fails":
+            if density_check:
+                density_data = density_check.outputs.data
+                total_node_count = 0
+                above_or_equal_5_count = 0
+
+                summary_data = density_data["summary"]
+                return summary_data["under_threshold_soundings"]
+            else:
+                return "No density check"
+        elif field_section == 'DENSITY' and field_name == r"% of nodes with 5 soundings or greater":
+            if density_check:
+                density_data = density_check.outputs.data
+                total_node_count = 0
+                above_or_equal_5_count = 0
+                for k, v in density_data["chart"]["data"].items():
+                    total_node_count += v
+                    if int(k) >= 5:
+                        above_or_equal_5_count += v
+
+                return above_or_equal_5_count / total_node_count * 100
+            else:
+                return "No density check"
+        elif field_section == 'DENSITY' and field_name == r"100% of nodes on SF":
+            # TODO: need to understand this metric
+            return ""
+        elif field_section == 'DENSITY' and field_name == "Density Check comment":
+            # User entered field (entered into the XLSX), so just leave empty
+            return ""
+        elif field_section == 'UNCERTAINTY' and field_name == "Number of Nodes with Uncertainty Fails":
+            return tvu_check.outputs.data["failed_cell_count"]
+        elif field_section == 'UNCERTAINTY' and field_name == r"% of Nodes with  Uncertainty Fails":
+            return tvu_check.outputs.data["fraction_failed"] * 100
+        elif field_section == 'UNCERTAINTY' and field_name == "TVU Check comment":
+            return ""
+        elif field_section == 'RESOLUTION' and field_name == "Resolution Check QAX Message":
+            return res_check.outputs.check_state
+
         else:
             return 0
 
