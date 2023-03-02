@@ -318,6 +318,12 @@ class DensityCheck(GridCheck):
         if self.spatial_qajson:
             data['map'] = self.tiles_geojson
 
+        data['summary'] = {
+            'total_soundings': total_soundings,
+            'percentage_over_threshold': percentage_over_threshold,
+            'under_threshold_soundings': under_threshold_soundings
+        }
+
         result = QajsonOutputs(
             execution=execution,
             files=None,
