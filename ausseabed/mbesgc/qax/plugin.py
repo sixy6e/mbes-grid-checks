@@ -77,7 +77,16 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
         return set_a == set_b
 
     def get_summary_details(self) -> List[Tuple[str, str]]:
+        # it may be worth moving these header files to their own
+        # dedicated qax plugin, that is always run irrespective
+        # of what plugins are selected by the user.
+        # Currently if the user doesn't run the MBES Grid Checks
+        # plugin (this one), then these header fields won't be
+        # available
         return [
+            ("header", "File Name"),
+            ("header", "Latest Update"),
+            ("header", "Summary"),
             ("header", "Number of Nodes"),
             ("DENSITY", "Number of Nodes with density fails"),
             ("DENSITY", r"% of nodes with 5 soundings or greater"),
@@ -126,7 +135,11 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
         if len(res_checks) >= 1:
             res_check = res_checks[0]
 
-        if field_section == 'header' and field_name == "Number of Nodes":
+        if field_section == 'header' and field_name == "File Name":
+            return Path(filename).name
+        elif field_section == 'header' and (field_name == "Latest Update" or field_name == "Summary"):
+            return ""
+        elif field_section == 'header' and field_name == "Number of Nodes":
             if density_check:
                 density_data = density_check.outputs.data
                 node_count = 0
