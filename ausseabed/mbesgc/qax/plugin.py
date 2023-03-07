@@ -145,7 +145,6 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
                 node_count = 0
                 for _, v in density_data["chart"]["data"].items():
                     node_count += v
-                print(node_count)
                 return node_count
             else:
                 return "No density check"
