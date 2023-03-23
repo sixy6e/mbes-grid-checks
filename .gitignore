@@ -1,3 +1,7 @@
+# test data
+tests/test_data/pink_chart/*
+
+
 # macOS
 .DS_Store
 
