@@ -53,6 +53,13 @@ class InputFileDetails:
         ibd = (input_file, band_index, band_type)
         self.input_band_details.append(ibd)
 
+    @property
+    def band_count(self):
+        return len(self.input_band_details)
+
+    def clear_band_details(self):
+        self.input_band_details.clear()
+
     def get_band(self, band_type: BandType) -> Tuple[str, int]:
         band_details = next(
             ibd
@@ -88,7 +95,7 @@ def _get_tiff_details(input_file):
     '''
     Single tiffs include all 3 bands
     '''
-    raster = gdal.Open(input_file)
+    raster: gdal.Dataset = gdal.Open(input_file)
     if raster is None:
         raise RuntimeError(
             f'input file {input_file} could not be opened'
@@ -98,33 +105,43 @@ def _get_tiff_details(input_file):
     geotransform = raster.GetGeoTransform()
     projection = raster.GetProjection()
 
-    if raster.RasterCount != 3:
-        raise RuntimeError(
-            f'input file ({input_file}) has {raster.RasterCount} bands and '
-            '3 are expected'
-        )
-
     ifd = InputFileDetails()
     ifd.size_x = size_x
     ifd.size_y = size_y
     ifd.geotransform = geotransform
     ifd.projection = projection
-    # band order is assumed based on convention
-    ifd.add_band_details(
-        input_file,
-        1,
-        BandType.depth
-    )
-    ifd.add_band_details(
-        input_file,
-        2,
-        BandType.density
-    )
-    ifd.add_band_details(
-        input_file,
-        3,
-        BandType.uncertainty
-    )
+
+    for band_index in range(1, raster.RasterCount + 1):
+        band: gdal.Band = raster.GetRasterBand(band_index)
+        band_name: str = band.GetDescription().lower()
+        if 'depth' in band_name:
+            ifd.add_band_details(input_file, band_index, BandType.depth)
+        elif 'density' in band_name:
+            ifd.add_band_details(input_file, band_index, BandType.density)
+        elif 'uncertainty' in band_name:
+            ifd.add_band_details(input_file, band_index, BandType.uncertainty)
+
+    if (ifd.band_count == raster.RasterCount or ifd.band_count == 3):
+        # then we were able to identify all available bands based on the names
+        pass
+    else:
+        # then we need to assume the default ordering of bands
+        # 1. depth
+        # 2. density
+        # 3. uncertainty
+
+        # first clear out anything that may have been added. Users must
+        # label all bands, or no labels will be used at all
+        ifd.clear_band_details()
+        for band_index in range(1, raster.RasterCount):
+            if band_index == 1:
+                band_type = BandType.depth
+            elif band_index == 2:
+                band_type = BandType.density
+            else:
+                band_type = BandType.uncertainty
+            ifd.add_band_details(input_file, band_index, band_type)
+
     return ifd
 
 
