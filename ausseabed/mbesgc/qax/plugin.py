@@ -18,6 +18,12 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
     # supported raw data file types
     file_types = [
         QaxFileType(
+            name="Shapefile",
+            extension="shp",
+            group="Pink Chart",
+            icon="shp.png"
+        ),
+        QaxFileType(
             name="GeoTIFF",
             extension="tiff",
             group="Survey DTMs",
