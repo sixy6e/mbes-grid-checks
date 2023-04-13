@@ -1,16 +1,90 @@
-from typing import List, Dict, NoReturn, Callable, Tuple
+from typing import List, Dict, NoReturn, Callable, Tuple, Any, Set
 from pathlib import Path
 
 
 from ausseabed.mbesgc.lib.allchecks import all_checks
 from ausseabed.mbesgc.lib.data import get_input_details, \
-    inputs_from_qajson_checks
+    inputs_from_qajson_checks, InputFileDetails, _get_tiff_details
 from ausseabed.mbesgc.lib.executor import Executor
 
 from hyo2.qax.lib.plugin import QaxCheckToolPlugin, QaxCheckReference, \
     QaxFileType
 from ausseabed.qajson.model import QajsonRoot, QajsonDataLevel, QajsonCheck, \
     QajsonFile, QajsonInputs
+
+
+class FileGrouping():
+    """ Utility class to help out grouping files that have been specified by users in
+    the QAX UI. Groups by file type and file name, a group is a collection of files
+    that contain different data (eg; depth, density, pink chart) for the same
+    area.
+    """
+
+    def __remove_separator(name: str) -> str:
+        potential_separators = ['-', '_', ' ']
+        for sep in potential_separators:
+            if name[-1] == sep:
+                return name[0:-1]
+
+    @staticmethod
+    def calculate_groupings(filename_list: List[Tuple[str, str]]) -> List['FileGrouping']:
+        """
+        filename list is a list of tuples; first element is the full file path, second
+        is the qajson file type (eg; "Survey DTMs" for grids, "Pink Chart" for coverage
+        area of interest)
+        """
+        band_suffixes = ["depth", "density", "uncertainty"]
+
+        file_groups: List[FileGrouping] = []
+
+        for full_path, ft in filename_list:
+            fn = Path(full_path).stem
+            if ft == "Survey DTMs":
+                # use this flage to track if this filename was found to be a single band in a collection
+                # or is a single file including all bands
+                fn_added = False
+                for bs in band_suffixes:
+                    if fn.lower().endswith(bs):
+                        basename = fn[0:-len(bs)]
+                        basename = FileGrouping.__remove_separator(basename)
+                        group = next(
+                            (fg for fg in file_groups if fg.grouping_name == basename),
+                            None
+                        )
+                        if group is None:
+                            group = FileGrouping(basename)
+                            file_groups.append(group)
+                        group.add_file(full_path, ft)
+                        fn_added = True
+                if not fn_added:
+                    # then file has not been captured as being depth, density, or uncertainty
+                    group = next(
+                        (fg for fg in file_groups if fg.grouping_name == fn),
+                        None
+                    )
+                    if group is None:
+                        group = FileGrouping(fn)
+                        file_groups.append(group)
+                    group.add_file(full_path, ft)
+            elif ft == "Pink Chart":
+                group = next(
+                    (fg for fg in file_groups if fg.grouping_name == fn),
+                    None
+                )
+                if group is None:
+                    group = FileGrouping(fn)
+                    file_groups.append(group)
+                group.add_file(full_path, ft)
+
+        return file_groups
+
+    def __init__(self, grouping_name: str) -> None:
+        self.grouping_name = grouping_name
+        # list of lists, first item is filename, second is the qajson file type
+        self.files: List[Tuple(str, str)] = []
+
+    def add_file(self, filename: str, file_type: str):
+        self.files.append( (filename, file_type) )
 
 
 class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
@@ -301,20 +375,25 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
                 dl_sp = getattr(qa_json.qa, dl)
                 dl_sp.checks.remove(mgc_check)
 
-        for (input_file, input_file_group) in files:
+        # `files` is a single flat list of all the input files (and file types)
+        # now take that and group it using the filenames, and types
+        # this is to support grouping tif files with bands spread across
+        # multiple files, and the potential inclusion of coverage areas (pink
+        # chart)
+        groups = FileGrouping.calculate_groupings(files)
+
+        for group in groups:
             for mgc_check in all_mgc_checks:
-                check_ref = self.get_check_reference(mgc_check.info.id)
-                if not check_ref.supports_file(input_file, input_file_group):
-                    continue
                 mgc_check_clone = QajsonCheck.from_dict(mgc_check.to_dict())
                 inputs = mgc_check_clone.get_or_add_inputs()
-                inputs.files.append(
-                    QajsonFile(
-                        path=str(input_file),
-                        file_type=input_file_group,
-                        description=None
+                for fn, ft in group.files:
+                    inputs.files.append(
+                        QajsonFile(
+                            path=str(fn),
+                            file_type=ft,
+                            description=None
+                        )
                     )
-                )
                 # ** ASSUME ** mgc checks only go in the survey_products
                 # data level
                 qa_json.qa.survey_products.checks.append(mgc_check_clone)
