@@ -91,56 +91,78 @@ class InputFileDetails:
         )
 
 
-def _get_tiff_details(input_file):
+def _get_tiff_details(input_files):
     '''
     Single tiffs include all 3 bands
     '''
-    raster: gdal.Dataset = gdal.Open(input_file)
-    if raster is None:
-        raise RuntimeError(
-            f'input file {input_file} could not be opened'
-        )
-    size_x = raster.RasterXSize
-    size_y = raster.RasterYSize
-    geotransform = raster.GetGeoTransform()
-    projection = raster.GetProjection()
-
     ifd = InputFileDetails()
-    ifd.size_x = size_x
-    ifd.size_y = size_y
-    ifd.geotransform = geotransform
-    ifd.projection = projection
 
-    for band_index in range(1, raster.RasterCount + 1):
-        band: gdal.Band = raster.GetRasterBand(band_index)
-        band_name: str = band.GetDescription().lower()
-        if 'depth' in band_name:
-            ifd.add_band_details(input_file, band_index, BandType.depth)
-        elif 'density' in band_name:
-            ifd.add_band_details(input_file, band_index, BandType.density)
-        elif 'uncertainty' in band_name:
-            ifd.add_band_details(input_file, band_index, BandType.uncertainty)
+    for input_file in input_files:
 
-    if (ifd.band_count == raster.RasterCount or ifd.band_count == 3):
-        # then we were able to identify all available bands based on the names
-        pass
-    else:
-        # then we need to assume the default ordering of bands
-        # 1. depth
-        # 2. density
-        # 3. uncertainty
+        raster: gdal.Dataset = gdal.Open(input_file)
+        if raster is None:
+            raise RuntimeError(
+                f'input file {input_file} could not be opened'
+            )
+        size_x = raster.RasterXSize
+        size_y = raster.RasterYSize
+        geotransform = raster.GetGeoTransform()
+        projection = raster.GetProjection()
 
-        # first clear out anything that may have been added. Users must
-        # label all bands, or no labels will be used at all
-        ifd.clear_band_details()
-        for band_index in range(1, raster.RasterCount):
-            if band_index == 1:
-                band_type = BandType.depth
-            elif band_index == 2:
-                band_type = BandType.density
-            else:
-                band_type = BandType.uncertainty
-            ifd.add_band_details(input_file, band_index, band_type)
+        # assumes the size,proj,geotransform of all input bands is the
+        # same, which is not enforced when there are multiple input
+        # files
+        ifd.size_x = size_x
+        ifd.size_y = size_y
+        ifd.geotransform = geotransform
+        ifd.projection = projection
+
+        file_added = False
+        for band_index in range(1, raster.RasterCount + 1):
+            band: gdal.Band = raster.GetRasterBand(band_index)
+            band_name: str = band.GetDescription().lower()
+            if 'depth' in band_name:
+                ifd.add_band_details(input_file, band_index, BandType.depth)
+                file_added = True
+            elif 'density' in band_name:
+                ifd.add_band_details(input_file, band_index, BandType.density)
+                file_added = True
+            elif 'uncertainty' in band_name:
+                ifd.add_band_details(input_file, band_index, BandType.uncertainty)
+                file_added = True
+
+        name_only = Path(input_file).stem.lower()
+
+        if file_added:
+            # already added, so skip this
+            pass
+        elif (ifd.band_count == raster.RasterCount or ifd.band_count == 3):
+            # then we were able to identify all available bands based on the names
+            pass
+        elif raster.RasterCount == 1 and 'depth' in name_only:
+            # then the band type is assumed by the filename
+            ifd.add_band_details(input_file, 1, BandType.depth)
+        elif raster.RasterCount == 1 and 'density' in name_only:
+            ifd.add_band_details(input_file, 1, BandType.density)
+        elif raster.RasterCount == 1 and 'uncertainty' in name_only:
+            ifd.add_band_details(input_file, 1, BandType.uncertainty)
+        else:
+            # then we need to assume the default ordering of bands
+            # 1. depth
+            # 2. density
+            # 3. uncertainty
+
+            # first clear out anything that may have been added. Users must
+            # label all bands, or no labels will be used at all
+            ifd.clear_band_details()
+            for band_index in range(1, raster.RasterCount):
+                if band_index == 1:
+                    band_type = BandType.depth
+                elif band_index == 2:
+                    band_type = BandType.density
+                else:
+                    band_type = BandType.uncertainty
+                ifd.add_band_details(input_file, band_index, band_type)
 
     return ifd
 
@@ -214,24 +236,33 @@ def get_input_details(
     from list of input files.
     '''
     inputdetails = []
-    for inputfile in inputfiles:
+
+    # update list of input files for relative path if one has been
+    # provided
+    for i in range(0, len(inputfiles)):
+        inputfile = inputfiles[i]
         if not os.path.isfile(inputfile) and relative_to is not None:
             test_rel_file = os.path.join(relative_to, inputfile)
             if os.path.isfile(test_rel_file):
-                inputfile = test_rel_file
-        if (inputfile.lower().endswith('.tif')
-                or inputfile.lower().endswith('.tiff')):
-            tifdetails = _get_tiff_details(inputfile)
-            inputdetails.append(tifdetails)
-        elif inputfile.lower().endswith('_density.bag'):
-            # ignore these bag files, we'll handle these in the next if case
-            continue
-        elif inputfile.lower().endswith('.bag'):
-            bagdetails = _get_bag_details(inputfile)
-            inputdetails.append(bagdetails)
-        else:
-            # ignore all other files passed in
-            continue
+                inputfiles[i] = test_rel_file
+
+    print("inputfiles")
+    print(inputfiles)
+
+    if len(inputfiles) == 0:
+        raise RuntimeError("No gridded input files provided")
+
+    if (inputfiles[0].lower().endswith('.tif')
+            or inputfiles[0].lower().endswith('.tiff')):
+        # assume all files are tif files if the first one is
+        tifdetails = _get_tiff_details(inputfiles)
+        inputdetails.append(tifdetails)
+    elif inputfiles[0].lower().endswith('_density.bag'):
+        # ignore these bag files, we'll handle these in the next if case
+        pass
+    elif inputfile[0].lower().endswith('.bag'):
+        bagdetails = _get_bag_details(inputfiles[0])
+        inputdetails.append(bagdetails)
 
     # maintain reference to the qajson entity this lot of input files was
     # generated from so we can update the qajson after check is complete.
@@ -243,17 +274,19 @@ def get_input_details(
 
 def inputs_from_qajson_checks(
         qajson_checks: List[QajsonCheck],
-        relative_to: str = None):
+        relative_to: str = None) -> List[InputFileDetails]:
 
+    print("def inputs_from_qajson_checks")
     inputs = []
     for qajson_check in qajson_checks:
         check_id = qajson_check.info.id
-        filenames = [
+        grid_filenames = [
             qajson_file.path
             for qajson_file in qajson_check.inputs.files
+            if qajson_file.file_type == "Survey DTMs"
         ]
 
-        check_inputs = get_input_details(qajson_check, filenames, relative_to)
+        check_inputs = get_input_details(qajson_check, grid_filenames, relative_to)
         for ci in check_inputs:
             cid_and_params = (check_id, qajson_check.inputs.params)
             ci.check_ids_and_params.append(cid_and_params)
