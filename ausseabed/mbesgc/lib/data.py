@@ -38,6 +38,9 @@ class InputFileDetails:
 
         self.input_band_details = []
 
+        # pink chart filename, if one was given
+        self.pink_chart_filename = None
+
         # list of check uuids that this input file will be run through
         self.check_ids_and_params = []
 
@@ -87,6 +90,7 @@ class InputFileDetails:
         bds = '\n'.join(bd)
         return (
             f'size: {self.size_x}, {self.size_y}\n'
+            f'pink chart file: {self.pink_chart_filename}\n'
             f'{bds}'
         )
 
@@ -285,11 +289,21 @@ def inputs_from_qajson_checks(
             for qajson_file in qajson_check.inputs.files
             if qajson_file.file_type == "Survey DTMs"
         ]
-
         check_inputs = get_input_details(qajson_check, grid_filenames, relative_to)
+
+        pc_filenames = [
+            qajson_file.path
+            for qajson_file in qajson_check.inputs.files
+            if qajson_file.file_type == "Pink Chart"
+        ]
+
         for ci in check_inputs:
             cid_and_params = (check_id, qajson_check.inputs.params)
             ci.check_ids_and_params.append(cid_and_params)
+
+            if len(pc_filenames) > 0:
+                ci.pink_chart_filename = pc_filenames[0]
+
         inputs.extend(check_inputs)
     return inputs
 
