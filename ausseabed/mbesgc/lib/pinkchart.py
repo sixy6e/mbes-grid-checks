@@ -3,6 +3,7 @@ import math
 
 from osgeo import gdal
 from osgeo import ogr
+from osgeo import osr
 from typing import List, Tuple
 
 
@@ -218,7 +219,16 @@ class PinkChartProcessor():
         pc_layer: ogr.Layer = pc_vector.GetLayer()
         pc_layer_extent_values = pc_layer.GetExtent(force=1)
         pc_layer_min_x, pc_layer_max_x, pc_layer_min_y, pc_layer_max_y = pc_layer_extent_values
-        pc_layer_extents = Extents(pc_layer_min_x, pc_layer_min_y, pc_layer_max_x, pc_layer_max_y)
+
+        ogr_srs_raster = osr.SpatialReference()
+        ogr_srs_raster.ImportFromWkt(data_raster_proj)
+
+        ogr_srs_pc = pc_layer.GetSpatialRef()
+        transform = osr.CoordinateTransformation(ogr_srs_pc, ogr_srs_raster)
+        pc_layer_min_x_trans, pc_layer_min_y_trans, _  = transform.TransformPoint(pc_layer_min_x, pc_layer_min_y)
+        pc_layer_max_x_trans, pc_layer_max_y_trans, _  = transform.TransformPoint(pc_layer_max_x, pc_layer_max_y)
+
+        pc_layer_extents = Extents(pc_layer_min_x_trans, pc_layer_min_y_trans, pc_layer_max_x_trans, pc_layer_max_y_trans)
 
         # expand out the extents of the pinkchart extents so that these extents
         # will line up with the source raster data
