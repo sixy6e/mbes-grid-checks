@@ -83,3 +83,14 @@ class TestPinkChart(unittest.TestCase):
         )
 
         pc.process()
+    
+
+    def test_generate_pinkchart_raster_different_projections(self):
+        pc = PinkChartProcessor(
+            [Path('/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/tests/test_data/ds02/in2018_c01_CombinedSurface_CUBE_2m_Rev2.tif')],
+            Path('/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/tests/test_data/ds02/in2018_c01_CombinedSurface_CUBE_2m_Rev2.shp'),
+            [Path('/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/tests/test_data/ds02_out/in2018_c01_CombinedSurface_CUBE_2m_Rev2.tif')],
+            Path('/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/tests/test_data/ds02_out/in2018_c01_CombinedSurface_CUBE_2m_Rev2_pc.tif')
+        )
+
+        pc.process()

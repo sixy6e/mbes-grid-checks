@@ -23,6 +23,7 @@ class BandType(str, Enum):
     depth = 'depth'
     density = 'density'
     uncertainty = 'uncertainty'
+    pinkChart = 'pinkChart'
 
 
 class InputFileDetails:
@@ -93,6 +94,23 @@ class InputFileDetails:
             f'pink chart file: {self.pink_chart_filename}\n'
             f'{bds}'
         )
+
+    def clone(self):
+        ''' Returns a new instance of InputFileDetails. Note: does not
+        clone input_band_details list.
+        '''
+        ifd = InputFileDetails()
+        ifd.size_x = self.size_x
+        ifd.size_y = self.size_y
+        ifd.geotransform = self.geotransform
+        ifd.projection = self.projection
+        ifd.pink_chart_filename = self.pink_chart_filename
+        ifd.check_ids_and_params = self.check_ids_and_params
+        ifd.qajson_check = self.qajson_check
+        # only thing we don't clone
+        ifd.check_ids_and_params = []
+
+        return ifd
 
 
 def _get_tiff_details(input_files):

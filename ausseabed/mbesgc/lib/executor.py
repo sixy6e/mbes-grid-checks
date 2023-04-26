@@ -7,12 +7,14 @@ from osgeo import gdal
 import numpy as np
 import numpy.ma as ma
 import os
+import tempfile
+from pathlib import Path
 
 from .check_utils import get_check
 from .data import InputFileDetails, BandType
 from .tiling import get_tiles, Tile
 from .gridcheck import GridCheck
-
+from .pinkchart import PinkChartProcessor
 
 class Executor:
 
@@ -32,6 +34,73 @@ class Executor:
         self.spatial_export = False
         self.spatial_export_location = None
         self.spatial_qajson = True
+
+        # list of temporary directories that need to be cleaned up after the Executor
+        # has completed processing
+        self.temp_dirs = []
+
+        # this source input files before any preprocessing is performed
+        self.source_input_file_details: List[InputFileDetails] = None
+
+    def _preprocess(self):
+        '''
+        Performs some preprocessing of the input datasets. eg; transformation
+        of the input rasters to line up with the pink chart.
+
+        If a pink chart file is given for an input file details set then this
+        will recreate all input files to match up with the pink chart, and
+        also generate a raster version of the pink chart.
+        '''
+        
+        self.source_input_file_details = list(self.input_file_details)
+
+        # iterate by index as we'll be replacing ifds as we iterate over this list
+        for ifd_index in range(0, len(self.input_file_details)):
+            ifd = self.input_file_details[ifd_index]
+
+            if ifd.pink_chart_filename is None:
+                # then there's no pre processing required, so skip to next ifd
+                continue
+
+            processed_ifd = ifd.clone()
+            # replace this set of input files (ifd) with the preprocessed version
+            self.input_file_details[ifd_index] = processed_ifd
+
+            # each ifd is a set of input files, the pink chart stuff needs to be
+            # done per each set of these inputs
+            if ifd.pink_chart_filename is None:
+                # don't do any of the following if there is no pink chart specified
+                continue
+            # temp_dir = tempfile.TemporaryDirectory()
+            # self.temp_dirs.append(temp_dir)
+            # temp_dir_path = Path(temp_dir.name)
+            temp_dir = tempfile.mkdtemp()
+            self.temp_dirs.append(temp_dir)
+            temp_dir_path = Path(temp_dir)
+
+
+            raster_inputs = []
+            raster_outputs = []
+            pc_output = temp_dir_path.joinpath(Path(ifd.pink_chart_filename).stem + ".tif")
+
+            for input_file, band_index, band_type in ifd.input_band_details:
+                raster_inputs.append(Path(input_file))
+                output_file = temp_dir_path.joinpath(Path(input_file).stem + ".tif")
+                raster_outputs.append(output_file)
+
+                processed_ifd.add_band_details(input_file, band_index, band_type)
+                print(Path(input_file))
+                print(Path(output_file))
+
+
+            pcp = PinkChartProcessor(
+                raster_inputs,
+                Path(ifd.pink_chart_filename),
+                raster_outputs,
+                pc_output
+            )
+            pcp.process()
+            processed_ifd.add_band_details(str(pc_output), 1, BandType.pinkChart)
 
     def _load_band_tile(self, filename: str, band_index: int, tile: Tile):
         src_ds = gdal.Open(filename)
