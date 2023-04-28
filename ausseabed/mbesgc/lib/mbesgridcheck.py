@@ -59,6 +59,7 @@ class DensityCheck(GridCheck):
             depth,
             density,
             uncertainty,
+            pinkchart,
             progress_callback=None):
 
         self.total_cell_count = int(density.count())
@@ -386,6 +387,7 @@ class TvuCheck(GridCheck):
             depth,
             density,
             uncertainty,
+            pinkchart,
             progress_callback=None):
         # run check on tile data
         a = self._depth_error
@@ -698,6 +700,7 @@ class ResolutionCheck(GridCheck):
             depth,
             density,
             uncertainty,
+            pinkchart,
             progress_callback=None):
         # run check on tile data
 

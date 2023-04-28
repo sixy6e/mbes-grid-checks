@@ -107,6 +107,13 @@ class Executor:
             processed_ifd.add_band_details(str(pc_output), 1, BandType.pinkChart)
 
     def _load_band_tile(self, filename: str, band_index: int, tile: Tile):
+        # function may be called even when the band was not given as input
+        # by the user. In such cases the filename and band index will be
+        # None. It's up to the checks later on to handle being given None
+        # instead of a numpy array 
+        if filename is None or band_index is None or tile is None:
+            return None
+
         src_ds = gdal.Open(filename)
         if src_ds is None:
             raise RuntimeError(f"Could not open {filename}")
@@ -136,6 +143,8 @@ class Executor:
         density_file, density_band_idx = ifd.get_band(BandType.density)
         uncertainty_file, uncertainty_band_idx = ifd.get_band(
             BandType.uncertainty)
+        pinkchart_file, pinkchart_band_idx = ifd.get_band(
+            BandType.pinkChart)
 
         depth_data = self._load_band_tile(
             depth_file, depth_band_idx, tile)
@@ -143,10 +152,13 @@ class Executor:
             density_file, density_band_idx, tile)
         uncertainty_data = self._load_band_tile(
             uncertainty_file, uncertainty_band_idx, tile)
+        pinkchart_data = self._load_band_tile(
+            pinkchart_file, pinkchart_band_idx, tile)
 
-        density_data = density_data.astype(int)
+        if density_data is not None:
+            density_data = density_data.astype(int)
 
-        return (depth_data, density_data, uncertainty_data)
+        return (depth_data, density_data, uncertainty_data, pinkchart_data)
 
     def _get_output_file_location(
             self,
@@ -164,6 +176,7 @@ class Executor:
         depth_data,
         density_data,
         uncertainty_data,
+        pinkchart_data,
         is_stopped=None,
     ):
         '''
@@ -192,7 +205,8 @@ class Executor:
                 tile,
                 depth_data,
                 density_data,
-                uncertainty_data
+                uncertainty_data,
+                pinkchart_data
             )
             check.check_ended()
 
@@ -263,7 +277,7 @@ class Executor:
                 if is_stopped is not None and is_stopped():
                     return
 
-                depth_data, density_data, uncertainty_data = self._load_data(
+                depth_data, density_data, uncertainty_data, pinkchart_data = self._load_data(
                     ifd,
                     tile
                 )
@@ -274,6 +288,7 @@ class Executor:
                     depth_data,
                     density_data,
                     uncertainty_data,
+                    pinkchart_data,
                     is_stopped
                 )
                 processed_tile_count += 1

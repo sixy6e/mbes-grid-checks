@@ -138,6 +138,7 @@ class GridCheck:
             depth,
             density,
             uncertainty,
+            pinkchart,
             progress_callback=None):
         '''
         Abstract function definition for how each check should implement its
@@ -151,6 +152,7 @@ class GridCheck:
             depth (numpy): Depth/elevation data
             density (numpy): Density data
             uncertainty (numpy): Uncertainty data
+            pinkchart (numpy): Pink Chart data
             progress_callback (function): optional callback function to
                 indicate progress to caller
 

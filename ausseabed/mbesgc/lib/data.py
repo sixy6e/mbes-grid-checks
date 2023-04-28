@@ -70,12 +70,15 @@ class InputFileDetails:
 
     def get_band(self, band_type: BandType) -> Tuple[str, int]:
         band_details = next(
-            ibd
-            for ibd in self.input_band_details
-            if ibd[2] == band_type
+            (
+                ibd
+                for ibd in self.input_band_details
+                if ibd[2] == band_type
+            ),
+            None
         )
         if band_details is None:
-            return None
+            return None, None
         else:
             return band_details[0], band_details[1]
 
