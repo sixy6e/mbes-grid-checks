@@ -49,6 +49,10 @@ class InputFileDetails:
         # to it.
         self.qajson_check = None
 
+        # keep track of the original InputFileDetails object
+        # this is set for all clones
+        self.source: InputFileDetails = None
+
     def add_band_details(
             self,
             input_file: str,
@@ -100,6 +104,7 @@ class InputFileDetails:
         clone input_band_details list.
         '''
         ifd = InputFileDetails()
+        ifd.source = self
         ifd.size_x = self.size_x
         ifd.size_y = self.size_y
         ifd.geotransform = self.geotransform
@@ -108,7 +113,7 @@ class InputFileDetails:
         ifd.check_ids_and_params = self.check_ids_and_params
         ifd.qajson_check = self.qajson_check
         # only thing we don't clone
-        ifd.check_ids_and_params = []
+        ifd.input_band_details = []
 
         return ifd
 

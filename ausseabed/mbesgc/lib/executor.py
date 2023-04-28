@@ -81,17 +81,14 @@ class Executor:
 
             raster_inputs = []
             raster_outputs = []
-            pc_output = temp_dir_path.joinpath(Path(ifd.pink_chart_filename).stem + ".tif")
+            pc_output = temp_dir_path.joinpath(Path(ifd.pink_chart_filename).stem + "_pinkchart.tif")
 
             for input_file, band_index, band_type in ifd.input_band_details:
                 raster_inputs.append(Path(input_file))
                 output_file = temp_dir_path.joinpath(Path(input_file).stem + ".tif")
                 raster_outputs.append(output_file)
 
-                processed_ifd.add_band_details(input_file, band_index, band_type)
-                print(Path(input_file))
-                print(Path(output_file))
-
+                processed_ifd.add_band_details(str(output_file), band_index, band_type)
 
             pcp = PinkChartProcessor(
                 raster_inputs,
@@ -100,6 +97,13 @@ class Executor:
                 pc_output
             )
             pcp.process()
+
+            # update the size of the rasters so the correct tiling strategy is calculated later
+            processed_ifd.size_x = pcp.size_x
+            processed_ifd.size_y = pcp.size_y
+
+            # now that we have a raster version of the pink chart we can add it as a band of data
+            # to the input file details
             processed_ifd.add_band_details(str(pc_output), 1, BandType.pinkChart)
 
     def _load_band_tile(self, filename: str, band_index: int, tile: Tile):
@@ -196,10 +200,17 @@ class Executor:
             # to merge the results together. Then when all tiles have been run
             # we'll have a single entry for each check in `check_result_cache`
             # that is the result of all tiles merged
-            if (ifd, check_id) in self.check_result_cache:
-                last_check = self.check_result_cache[(ifd, check_id)]
+            src_ifd = ifd
+            if src_ifd.source is not None:
+                # make sure we're using the actual source input file details and
+                # not a clone. If we use the clone the qajson won't be updated
+                # correctly
+                src_ifd = src_ifd.source
+
+            if (src_ifd, check_id) in self.check_result_cache:
+                last_check = self.check_result_cache[(src_ifd, check_id)]
                 check.merge_results(last_check)
-            self.check_result_cache[(ifd, check_id)] = check
+            self.check_result_cache[(src_ifd, check_id)] = check
 
     def __update_progress(self, progress_callback, progress):
         if progress_callback is None:
@@ -213,6 +224,10 @@ class Executor:
         qajson_update_callback=None,
         is_stopped=None
     ):
+        # preprocess the data
+        # - generate pink chart raster, and clip existing rasters to pink chart
+        self._preprocess()
+
         # clear out any previously run checks
         self.check_result_cache = {}
 

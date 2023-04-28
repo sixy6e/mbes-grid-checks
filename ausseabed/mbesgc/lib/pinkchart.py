@@ -76,6 +76,10 @@ class PinkChartProcessor():
 
         self.pinkchart_file = source_pinkchart
         self.rasterised_file = output_pinkchart_raster
+
+        # size of the output rasters in pixels
+        self.size_x = None
+        self.size_y = None
         
     def _calc_ideal_value(
             self,
@@ -194,6 +198,10 @@ class PinkChartProcessor():
         gdal.Warp(out_raster, source, options=options)
 
         out_raster.FlushCache()
+
+        self.size_x = out_raster.RasterXSize
+        self.size_y = out_raster.RasterYSize
+
         del out_raster
 
     def process(self):
