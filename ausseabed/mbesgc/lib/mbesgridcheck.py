@@ -52,6 +52,9 @@ class DensityCheck(GridCheck):
         # will allow it to be shown in the UI more easily
         self.pixel_growth = 5
 
+        # was this check run without a density layer (the only layer it needs)
+        self.missing_density = False
+
     def run(
             self,
             ifd: InputFileDetails,
@@ -61,6 +64,16 @@ class DensityCheck(GridCheck):
             uncertainty,
             pinkchart,
             progress_callback=None):
+
+        # this check only requires the density layer, so check it is given
+        # if not mark this check as aborted
+        self.missing_density = density is None
+        if self.missing_density:
+            self.execution_status = "aborted"
+            self.error_message = "Missing density data"
+            self.density_histogram = {}
+            # we cant run the check so return
+            return
 
         self.total_cell_count = int(density.count())
         # skip processing this chunk of data if it contains only nodata
