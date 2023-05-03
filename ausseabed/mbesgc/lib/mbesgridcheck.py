@@ -694,6 +694,8 @@ class ResolutionCheck(GridCheck):
         # will allow it to be shown in the UI more easily
         self.pixel_growth = 5
 
+        self.missing_depth = None
+
     def merge_results(self, last_check: GridCheck):
         self.start_time = last_check.start_time
 
@@ -716,6 +718,15 @@ class ResolutionCheck(GridCheck):
             pinkchart,
             progress_callback=None):
         # run check on tile data
+
+        # this check only requires the density layer, so check it is given
+        # if not mark this check as aborted
+        self.missing_depth = depth is None
+        if self.missing_depth:
+            self.execution_status = "aborted"
+            self.error_message = "Missing depth data"
+            # we cant run the check so return
+            return
 
         self.grid_resolution = ifd.geotransform[1]
 
