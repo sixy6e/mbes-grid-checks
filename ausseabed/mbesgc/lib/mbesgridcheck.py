@@ -381,6 +381,12 @@ class TvuCheck(GridCheck):
         # will allow it to be shown in the UI more easily
         self.pixel_growth = 5
 
+        self.total_cell_count = 0
+        self.failed_cell_count = 0
+
+        self.missing_depth = None
+        self.missing_uncertainty = None
+
     def merge_results(self, last_check: GridCheck):
         self.start_time = last_check.start_time
 
@@ -403,6 +409,28 @@ class TvuCheck(GridCheck):
             pinkchart,
             progress_callback=None):
         # run check on tile data
+
+        # this check only requires the density layer, so check it is given
+        # if not mark this check as aborted
+        self.missing_depth = depth is None
+        self.missing_uncertainty = uncertainty is None
+
+        if self.missing_depth and self.missing_uncertainty:
+            self.execution_status = "aborted"
+            self.error_message = "Missing depth and uncertainty data"
+            # we cant run the check so return
+            return
+        elif self.missing_depth:
+            self.execution_status = "aborted"
+            self.error_message = "Missing depth data"
+            # we cant run the check so return
+            return
+        elif self.missing_uncertainty:
+            self.execution_status = "aborted"
+            self.error_message = "Missing uncertainty data"
+            # we cant run the check so return
+            return
+
         a = self._depth_error
         b = self._depth_error_factor
 
@@ -595,17 +623,29 @@ class TvuCheck(GridCheck):
             status=self.execution_status,
             error=self.error_message
         )
+        data = {}
 
-        data = {
-            "failed_cell_count": self.failed_cell_count,
-            "total_cell_count": self.total_cell_count,
-            "fraction_failed": self.failed_cell_count / self.total_cell_count,
-        }
+        if self.execution_status != "aborted":
+            data = {
+                "failed_cell_count": self.failed_cell_count,
+                "total_cell_count": self.total_cell_count,
+                "fraction_failed": self.failed_cell_count / self.total_cell_count,
+            }
 
-        if self.spatial_qajson:
-            data['map'] = self.tiles_geojson
+            if self.spatial_qajson:
+                data['map'] = self.tiles_geojson
 
-        if self.failed_cell_count > 0:
+        if self.execution_status == "aborted":
+            return QajsonOutputs(
+                execution=execution,
+                files=None,
+                count=None,
+                percentage=None,
+                messages=[self.error_message],
+                data=data,
+                check_state=GridCheckState.cs_fail
+            )
+        elif self.failed_cell_count > 0:
             percent_failed = (
                 self.failed_cell_count / self.total_cell_count * 100
             )
@@ -694,6 +734,9 @@ class ResolutionCheck(GridCheck):
         # will allow it to be shown in the UI more easily
         self.pixel_growth = 5
 
+        self.total_cell_count = 0
+        self.failed_cell_count = 0
+
         self.missing_depth = None
 
     def merge_results(self, last_check: GridCheck):
@@ -719,7 +762,7 @@ class ResolutionCheck(GridCheck):
             progress_callback=None):
         # run check on tile data
 
-        # this check only requires the density layer, so check it is given
+        # this check only requires the depth layer, so check it is given
         # if not mark this check as aborted
         self.missing_depth = depth is None
         if self.missing_depth:
@@ -928,17 +971,29 @@ class ResolutionCheck(GridCheck):
             error=self.error_message
         )
 
-        data = {
-            "failed_cell_count": self.failed_cell_count,
-            "total_cell_count": self.total_cell_count,
-            "fraction_failed": self.failed_cell_count / self.total_cell_count,
-            "grid_resolution": self.grid_resolution
-        }
+        data = {}
+        if self.execution_status != "aborted":
+            data = {
+                "failed_cell_count": self.failed_cell_count,
+                "total_cell_count": self.total_cell_count,
+                "fraction_failed": self.failed_cell_count / self.total_cell_count,
+                "grid_resolution": self.grid_resolution
+            }
 
-        if self.spatial_qajson:
-            data['map'] = self.tiles_geojson
+            if self.spatial_qajson:
+                data['map'] = self.tiles_geojson
 
-        if self.failed_cell_count > 0:
+        if self.execution_status == "aborted":
+            return QajsonOutputs(
+                execution=execution,
+                files=None,
+                count=None,
+                percentage=None,
+                messages=[self.error_message],
+                data=data,
+                check_state=GridCheckState.cs_fail
+            )
+        elif self.failed_cell_count > 0:
             percent_failed = (
                 self.failed_cell_count / self.total_cell_count * 100
             )
