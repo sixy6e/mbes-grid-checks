@@ -178,6 +178,29 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
             ("RESOLUTION", "Resolution Check QAX Message"),
         ]
 
+    def _revision_from_filename(self, filename: str) -> str:
+        """ Extracts  revision id from the filename. This is indicated by a token
+        of the filename starting with `r`
+        """
+        potential_separators = ['-', '_', ' ']
+        name_only = filename
+        separator = None
+        separator_count = 0
+        for sep in potential_separators:
+            c = name_only.count(sep)
+            if c > separator_count:
+                separator = sep
+                separator_count = c
+
+        if separator_count == 0:
+            return name_only
+
+        name_tokens = name_only.split(separator)
+        for t in name_tokens:
+            if t.startswith('r') and len(t) > 1:
+                return t
+        return ""
+
     def get_summary_value(
             self,
             field_section: str,
@@ -217,7 +240,10 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
 
         if field_section == 'header' and field_name == "File Name":
             return Path(filename).name
-        elif field_section == 'header' and (field_name == "Latest Update" or field_name == "Summary"):
+        elif field_section == 'header' and field_name == "Latest Update":
+            fn = Path(filename).name
+            return self._revision_from_filename(fn)
+        elif field_section == 'header' and field_name == "Summary":
             return ""
         elif field_section == 'header' and field_name == "Number of Nodes":
             if density_check:

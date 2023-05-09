@@ -1,7 +1,7 @@
 import unittest
 from typing import List
 
-from ausseabed.mbesgc.qax.plugin import FileGrouping
+from ausseabed.mbesgc.qax.plugin import FileGrouping, MbesGridChecksQaxPlugin
 
 class TestGrouping(unittest.TestCase):
 
@@ -26,3 +26,11 @@ class TestGrouping(unittest.TestCase):
             print(g.grouping_name)
             for f,t in g.files:
                 print("    " + f)
+
+    def test_extract_revision(self):
+        fn = "foo_bar_r123_xyz"
+
+        plugin = MbesGridChecksQaxPlugin()
+        revision = plugin._revision_from_filename(fn)
+
+        self.assertEqual(revision, 'r123')
