@@ -156,20 +156,46 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
         set_b = set([str(p.path) for p in b.files])
         return set_a == set_b
 
-    def get_summary_details(self) -> List[Tuple[str, str]]:
+    def get_summary_details(self, qajson: QajsonRoot) -> List[Tuple[str, str]]:
         # it may be worth moving these header files to their own
         # dedicated qax plugin, that is always run irrespective
         # of what plugins are selected by the user.
         # Currently if the user doesn't run the MBES Grid Checks
         # plugin (this one), then these header fields won't be
         # available
+
+        percentage_node_number = '5'
+
+        # look through all the checks in the qajson to find the denisty check
+        # and from this density check pull out the min soundings per node at percentage
+        # parameter as this needs to be included in the summary label
+        density_check = next(
+            (
+                c
+                for c in qajson.qa.survey_products.checks
+                if c.info.name == 'Density Check'
+            ),
+            None
+        )
+        if density_check:
+            min_s_a_p = next(
+                (
+                    p
+                    for p in density_check.inputs.params
+                    if p.name == 'Minimum Soundings per node at percentage'
+                ),
+                None
+            )
+            if min_s_a_p:
+                percentage_node_number = min_s_a_p.value
+
         return [
             ("header", "File Name"),
             ("header", "Latest Update"),
             ("header", "Summary"),
             ("header", "Number of Nodes"),
             ("DENSITY", "Number of Nodes with density fails"),
-            ("DENSITY", r"% of nodes with 5 soundings or greater"),
+            ("DENSITY", r"% of nodes with " + str(percentage_node_number) + " soundings or greater"),
             ("DENSITY", r"100% of nodes on SF"),
             ("DENSITY", "Density Check comment"),
             ("UNCERTAINTY", "Number of Nodes with Uncertainty Fails"),
