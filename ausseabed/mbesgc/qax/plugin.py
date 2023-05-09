@@ -221,6 +221,12 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
         # should really only be one
         if len(density_checks) >= 1:
             density_check = density_checks[0]
+        
+            # check if the density check failed, or was aborted. If so then
+            # we can't rely on any of its outputs so this shouldn't be
+            # included in the summary either
+            if density_check.outputs.execution.status != 'completed':
+                density_check = None
 
         tvu_check = None
         tvu_checks = self._checks_filtered_by_name(
@@ -229,6 +235,8 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
         )
         if len(tvu_checks) >= 1:
             tvu_check = tvu_checks[0]
+            if tvu_check.outputs.execution.status != 'completed':
+                tvu_check = None
 
         res_check = None
         res_checks = self._checks_filtered_by_name(
@@ -237,6 +245,8 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
         )
         if len(res_checks) >= 1:
             res_check = res_checks[0]
+            if res_check.outputs.execution.status != 'completed':
+                res_check = None
 
         if field_section == 'header' and field_name == "File Name":
             return Path(filename).name
@@ -284,9 +294,15 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
             # User entered field (entered into the XLSX), so just leave empty
             return ""
         elif field_section == 'UNCERTAINTY' and field_name == "Number of Nodes with Uncertainty Fails":
-            return tvu_check.outputs.data["failed_cell_count"]
+            if tvu_check:
+                return tvu_check.outputs.data["failed_cell_count"]
+            else:
+                return "No TVU check"
         elif field_section == 'UNCERTAINTY' and field_name == r"% of Nodes with  Uncertainty Fails":
-            return tvu_check.outputs.data["fraction_failed"] * 100
+            if tvu_check:
+                return tvu_check.outputs.data["fraction_failed"] * 100
+            else:
+                return "No TVU check"
         elif field_section == 'UNCERTAINTY' and field_name == "TVU Check comment":
             return ""
         elif field_section == 'RESOLUTION' and field_name == "Resolution Check QAX Message":
