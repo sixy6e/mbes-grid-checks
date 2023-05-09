@@ -293,24 +293,15 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
         elif field_section == 'DENSITY' and field_name == "Number of Nodes with density fails":
             if density_check:
                 density_data = density_check.outputs.data
-                total_node_count = 0
-                above_or_equal_5_count = 0
-
                 summary_data = density_data["summary"]
-                return summary_data["under_threshold_soundings"]
+                return summary_data["under_absolute_threshold_count"]
             else:
                 return "No density check"
-        elif field_section == 'DENSITY' and field_name == r"% of nodes with 5 soundings or greater":
+        elif field_section == 'DENSITY' and field_name.startswith(r"% of nodes with"):
             if density_check:
                 density_data = density_check.outputs.data
-                total_node_count = 0
-                above_or_equal_5_count = 0
-                for k, v in density_data["chart"]["data"].items():
-                    total_node_count += v
-                    if int(k) >= 5:
-                        above_or_equal_5_count += v
-
-                return above_or_equal_5_count / total_node_count * 100
+                summary_data = density_data["summary"]
+                return summary_data["percentage_over_threshold"]
             else:
                 return "No density check"
         elif field_section == 'DENSITY' and field_name == r"100% of nodes on SF":
@@ -335,7 +326,7 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
             return res_check.outputs.check_state
 
         else:
-            return 0
+            return "No summary value"
 
 
     def run(

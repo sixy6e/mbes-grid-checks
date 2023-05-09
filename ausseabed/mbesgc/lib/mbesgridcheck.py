@@ -287,14 +287,15 @@ class DensityCheck(GridCheck):
         check_state = None
 
         lowest_sounding_count, occurrences = next(iter(counts.items()))
+
+        under_absolute_threshold_count = 0
         if lowest_sounding_count < self._min_spn:
-            c = 0
             for sounding_count, occurrences in iter(counts.items()):
                 if sounding_count >= self._min_spn:
                     break
-                c += occurrences
+                under_absolute_threshold_count += occurrences
             messages.append(
-                f'{c} nodes were found to be under the Minimum Soundings per '
+                f'{under_absolute_threshold_count} nodes were found to be under the Minimum Soundings per '
                 f'node setting ({self._min_spn})'
             )
             check_state = GridCheckState.cs_fail
@@ -334,6 +335,7 @@ class DensityCheck(GridCheck):
 
         data['summary'] = {
             'total_soundings': total_soundings,
+            'under_absolute_threshold_count': under_absolute_threshold_count,
             'percentage_over_threshold': percentage_over_threshold,
             'under_threshold_soundings': under_threshold_soundings
         }
