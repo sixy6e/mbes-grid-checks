@@ -276,9 +276,6 @@ def get_input_details(
             if os.path.isfile(test_rel_file):
                 inputfiles[i] = test_rel_file
 
-    print("inputfiles")
-    print(inputfiles)
-
     if len(inputfiles) == 0:
         raise RuntimeError("No gridded input files provided")
 
