@@ -111,7 +111,8 @@ class TestDensityCheck(unittest.TestCase):
             tile=self.dummy_tile,
             depth=self.depth,
             density=self.density,
-            uncertainty=self.uncertainty
+            uncertainty=self.uncertainty,
+            pinkchart=None
         )
 
         density_histogram = check.density_histogram
@@ -144,7 +145,8 @@ class TestDensityCheck(unittest.TestCase):
             tile=self.dummy_tile,
             depth=self.depth,
             density=self.density,
-            uncertainty=self.uncertainty
+            uncertainty=self.uncertainty,
+            pinkchart=None
         )
 
         # now check the output data

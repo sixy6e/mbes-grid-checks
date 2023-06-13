@@ -83,7 +83,8 @@ class TestDensityCheck(unittest.TestCase):
             tile=self.dummy_tile,
             depth=self.depth,
             density=self.density,
-            uncertainty=self.uncertainty
+            uncertainty=self.uncertainty,
+            pinkchart=None
         )
 
         # 17 because three of the cells are masked
