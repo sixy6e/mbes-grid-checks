@@ -303,7 +303,6 @@ def inputs_from_qajson_checks(
         qajson_checks: List[QajsonCheck],
         relative_to: str = None) -> List[InputFileDetails]:
 
-    print("def inputs_from_qajson_checks")
     inputs = []
     for qajson_check in qajson_checks:
         check_id = qajson_check.info.id
