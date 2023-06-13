@@ -316,7 +316,7 @@ def inputs_from_qajson_checks(
         pc_filenames = [
             qajson_file.path
             for qajson_file in qajson_check.inputs.files
-            if qajson_file.file_type == "Pink Chart"
+            if qajson_file.file_type == "Coverage Area"
         ]
 
         for ci in check_inputs:

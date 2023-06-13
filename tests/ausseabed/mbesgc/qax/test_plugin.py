@@ -14,9 +14,9 @@ class TestGrouping(unittest.TestCase):
             ("/test/foo/in2018_c02_CombinedSurface_CUBE_2m_Rev2_density.tif", "Survey DTMs"),
             ("/test/foo/in2018_c02_CombinedSurface_CUBE_2m_Rev2_uncertainty.tif", "Survey DTMs"),
             ("/test/foo/in2018_c03_CombinedSurface_CUBE_2m_Rev2.tif", "Survey DTMs"),
-            ("/test/pinkcharts/in2018_c02_CombinedSurface_CUBE_2m_Rev2.shp", "Pink Chart"),
-            ("/test/pinkcharts/in2018_c01_CombinedSurface_CUBE_2m_Rev2.shp", "Pink Chart"),
-            ("/test/pinkcharts/in2018_c03_CombinedSurface_CUBE_2m_Rev2.shp", "Pink Chart")
+            ("/test/pinkcharts/in2018_c02_CombinedSurface_CUBE_2m_Rev2.shp", "Coverage Area"),
+            ("/test/pinkcharts/in2018_c01_CombinedSurface_CUBE_2m_Rev2.shp", "Coverage Area"),
+            ("/test/pinkcharts/in2018_c03_CombinedSurface_CUBE_2m_Rev2.shp", "Coverage Area")
         ]
 
         groups = FileGrouping.calculate_groupings(filename_list)

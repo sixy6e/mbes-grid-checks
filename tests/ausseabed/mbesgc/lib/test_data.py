@@ -21,7 +21,7 @@ check01_str = """
         "files": [
             {
                 "path": "/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/tests/test_data/ds02/in2018_c01_CombinedSurface_CUBE_2m_Rev2.shp",
-                "file_type": "Pink Chart"
+                "file_type": "Coverage Area"
             },
             {
                 "path": "/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/tests/test_data/ds02/in2018_c01_CombinedSurface_CUBE_2m_Rev2.tif",
@@ -62,7 +62,7 @@ check02_str = """
         "files": [
             {
                 "path": "/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/tests/test_data/ds01/in2018_c01clip_CombinedSurface_CUBE_2m_Rev2.shp",
-                "file_type": "Pink Chart"
+                "file_type": "Coverage Area"
             },
             {
                 "path": "/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/tests/test_data/ds01/in2018_c01clip_CombinedSurface_CUBE_2m_Rev2_uncertainty.tif",

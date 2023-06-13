@@ -30,7 +30,7 @@ class FileGrouping():
     def calculate_groupings(filename_list: List[Tuple[str, str]]) -> List['FileGrouping']:
         """
         filename list is a list of tuples; first element is the full file path, second
-        is the qajson file type (eg; "Survey DTMs" for grids, "Pink Chart" for coverage
+        is the qajson file type (eg; "Survey DTMs" for grids, "Converage Area" for coverage
         area of interest)
         """
         band_suffixes = ["depth", "density", "uncertainty"]
@@ -66,7 +66,7 @@ class FileGrouping():
                         group = FileGrouping(fn)
                         file_groups.append(group)
                     group.add_file(full_path, ft)
-            elif ft == "Pink Chart":
+            elif ft == "Coverage Area":
                 group = next(
                     (fg for fg in file_groups if fg.grouping_name == fn),
                     None
@@ -94,7 +94,7 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
         QaxFileType(
             name="Shapefile",
             extension="shp",
-            group="Pink Chart",
+            group="Coverage Area",
             icon="shp.png"
         ),
         QaxFileType(
