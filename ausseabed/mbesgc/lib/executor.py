@@ -23,8 +23,8 @@ class Executor:
             input_file_details: List[InputFileDetails],
             check_classes):
         self.input_file_details = input_file_details
-        self.tile_size_x = 2000
-        self.tile_size_y = 2000
+        self.tile_size_x = 40000
+        self.tile_size_y = 40000
         self.checks = check_classes
 
         # used to store the results of each check as the checks are run
