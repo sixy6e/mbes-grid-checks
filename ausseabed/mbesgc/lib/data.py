@@ -5,7 +5,8 @@ to what they represent
 '''
 
 from enum import Enum
-from osgeo import gdal
+from osgeo import gdal, osr
+from geojson import MultiPolygon
 from typing import Tuple, List, Type
 import os
 import os.path
@@ -92,6 +93,31 @@ class InputFileDetails:
             input_file, _, _ = self.input_band_details[0]
             fn = Path(input_file).stem
             return fn
+
+    def get_extents_feature(self) -> MultiPolygon:
+        ''' Gets the extents of this input file based on the geotransform as a geojson feature'''
+        minx = self.geotransform[0]
+        maxy = self.geotransform[3]
+        maxx = minx + self.geotransform[1] * self.size_x
+        miny = maxy + self.geotransform[5] * self.size_y
+
+        ogr_srs = osr.SpatialReference()
+        ogr_srs.ImportFromWkt(self.projection)
+        ogr_srs_out = osr.SpatialReference()
+        ogr_srs_out.ImportFromEPSG(4326)
+        transform = osr.CoordinateTransformation(ogr_srs, ogr_srs_out)
+
+        transformed_bounds = transform.TransformBounds(minx, miny, maxx, maxy, 2)
+        minx, miny, maxx, maxy = transformed_bounds
+
+        polygon = MultiPolygon([[
+            (miny, minx),
+            (miny, maxx),
+            (maxy, maxx),
+            (maxy, minx),
+        ]])
+
+        return polygon
 
     def __repr__(self):
         bd = [f'  {fn} {bi} {bt}' for (fn, bi, bt) in self.input_band_details]

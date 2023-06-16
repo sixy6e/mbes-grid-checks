@@ -46,6 +46,7 @@ class DensityCheck(GridCheck):
             'Minimum Soundings per node at percentage')
 
         self.tiles_geojson = MultiPolygon()
+        self.extents_geojson = MultiPolygon()
 
         # amount of padding to place around failing pixels
         # this simplifies the geometry, and enlarges the failing area that
@@ -119,6 +120,8 @@ class DensityCheck(GridCheck):
         # theres a bit of duplication; unfortunately duplication in code AND
         # processing.
         if self.spatial_qajson:
+            self.extents_geojson = ifd.get_extents_feature()
+
             tile_ds = gdal.GetDriverByName('MEM').Create(
                 '',
                 tile.max_x - tile.min_x,
@@ -332,6 +335,7 @@ class DensityCheck(GridCheck):
 
         if self.spatial_qajson:
             data['map'] = self.tiles_geojson
+            data['extents'] = self.extents_geojson
 
         data['summary'] = {
             'total_soundings': total_soundings,
@@ -377,6 +381,7 @@ class TvuCheck(GridCheck):
             'Factor of Depth Dependent Errors')
 
         self.tiles_geojson = MultiPolygon()
+        self.extents_geojson = MultiPolygon()
 
         # amount of padding to place around failing pixels
         # this simplifies the geometry, and enlarges the failing area that
@@ -474,6 +479,8 @@ class TvuCheck(GridCheck):
         # see notes on density check for more details on the processing performed
         # below
         if self.spatial_qajson:
+            self.extents_geojson = ifd.get_extents_feature()
+
             # grow out failed pixels to make them more obvious. We've already
             # calculated the pass/fail stats so this won't impact results.
             failed_uncertainty_int8_grow = self._grow_pixels(
@@ -636,6 +643,7 @@ class TvuCheck(GridCheck):
 
             if self.spatial_qajson:
                 data['map'] = self.tiles_geojson
+                data['extents'] = self.extents_geojson
 
         if self.execution_status == "aborted":
             return QajsonOutputs(
@@ -730,6 +738,7 @@ class ResolutionCheck(GridCheck):
             'Below Threshold FDS Depth Constant')
 
         self.tiles_geojson = MultiPolygon()
+        self.extents_geojson = MultiPolygon()
 
         # amount of padding to place around failing pixels
         # this simplifies the geometry, and enlarges the failing area that
@@ -833,6 +842,8 @@ class ResolutionCheck(GridCheck):
         # see notes on density check for more details on the processing performed
         # below
         if self.spatial_qajson:
+            self.extents_geojson = ifd.get_extents_feature()
+
             # grow out failed pixels to make them more obvious. We've already
             # calculated the pass/fail stats so this won't impact results.
             failed_resolution_int8_grow = self._grow_pixels(
@@ -984,6 +995,7 @@ class ResolutionCheck(GridCheck):
 
             if self.spatial_qajson:
                 data['map'] = self.tiles_geojson
+                data['extents'] = self.extents_geojson
 
         if self.execution_status == "aborted":
             return QajsonOutputs(
