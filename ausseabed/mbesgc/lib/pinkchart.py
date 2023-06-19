@@ -80,6 +80,8 @@ class PinkChartProcessor():
         # size of the output rasters in pixels
         self.size_x = None
         self.size_y = None
+
+        self.geotransform = None
         
     def _calc_ideal_value(
             self,
@@ -201,6 +203,7 @@ class PinkChartProcessor():
 
         self.size_x = out_raster.RasterXSize
         self.size_y = out_raster.RasterYSize
+        self.geotransform = gt
 
         del out_raster
 

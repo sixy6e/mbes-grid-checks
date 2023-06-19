@@ -101,6 +101,7 @@ class Executor:
             # update the size of the rasters so the correct tiling strategy is calculated later
             processed_ifd.size_x = pcp.size_x
             processed_ifd.size_y = pcp.size_y
+            processed_ifd.geotransform = pcp.geotransform
 
             # now that we have a raster version of the pink chart we can add it as a band of data
             # to the input file details
