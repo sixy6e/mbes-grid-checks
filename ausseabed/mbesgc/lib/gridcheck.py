@@ -187,7 +187,7 @@ class GridCheck:
         '''
         for in_feat in in_lyr:
             geom = in_feat.GetGeometryRef()
-            simple_geom = geom.Simplify(simplify_distance)
+            simple_geom = geom.SimplifyPreserveTopology(simplify_distance)
             self.__add_geom(simple_geom, out_lyr)
 
     def __add_geom(self, geom, out_lyr):
