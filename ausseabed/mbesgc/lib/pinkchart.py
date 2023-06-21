@@ -195,7 +195,8 @@ class PinkChartProcessor():
                 srcNodata=nodata,
                 dstNodata=nodata,
                 cutlineDSName=cutline_dataset_name,
-                cutlineLayer=cutline_layer_name
+                cutlineLayer=cutline_layer_name,
+                cutlineBlend=1
             )
         gdal.Warp(out_raster, source, options=options)
 
