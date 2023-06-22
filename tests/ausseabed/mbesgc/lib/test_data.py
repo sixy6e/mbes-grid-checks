@@ -3,7 +3,8 @@ import json
 
 from ausseabed.qajson.model import QajsonCheck
 
-from ausseabed.mbesgc.lib.data import inputs_from_qajson_checks
+from ausseabed.mbesgc.lib.data import \
+    inputs_from_qajson_checks, InputFileDetails, BandType
 
 check01_str = """
 {
@@ -20,11 +21,11 @@ check01_str = """
     "inputs": {
         "files": [
             {
-                "path": "/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/tests/test_data/ds02/in2018_c01_CombinedSurface_CUBE_2m_Rev2.shp",
+                "path": "/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/tests/test_data/ds02/in2018_c01_cs_CUBE_2m_Rev2.shp",
                 "file_type": "Coverage Area"
             },
             {
-                "path": "/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/tests/test_data/ds02/in2018_c01_CombinedSurface_CUBE_2m_Rev2.tif",
+                "path": "/Users/lachlan/work/projects/qa4mb/repo/mbes-grid-checks/tests/test_data/ds02/in2018_c01_cs_CUBE_2m_Rev2.tif",
                 "file_type": "Survey DTMs"
             }
         ],
@@ -113,3 +114,24 @@ class TestData(unittest.TestCase):
         print("inputs for check")
         for input in inputs:
             print(input)
+
+    def test_has_same_inputs(self):
+        a = InputFileDetails()
+        a.add_band_details('f1', 1, BandType.depth)
+        a.add_band_details('f1', 2, BandType.density)
+        a.add_band_details('f1', 3, BandType.uncertainty)
+
+        b = InputFileDetails()
+        b.add_band_details('f1', 2, BandType.density)
+        b.add_band_details('f1', 1, BandType.depth)
+        b.add_band_details('f1', 3, BandType.uncertainty)
+
+        self.assertTrue(a.has_same_inputs(b))
+
+        c = InputFileDetails()
+        c.add_band_details('f2', 1, BandType.depth)
+        c.add_band_details('f2', 2, BandType.density)
+        c.add_band_details('f2', 3, BandType.uncertainty)
+
+        self.assertFalse(a.has_same_inputs(c))
+

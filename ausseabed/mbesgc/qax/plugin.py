@@ -355,9 +355,12 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
         self.exe.run(pg_call, qajson_update_callback, is_stopped)
 
         for (ifd, check_id), check in self.exe.check_result_cache.items():
-            check_outputs = check.get_outputs()
-
-            ifd.qajson_check.outputs = check_outputs
+            for i, qajson_check in enumerate(ifd.qajson_checks):
+                # the input file details includes a number of qajson check references
+                # we need to make sure we only update the output qajson for the current
+                # check.
+                if (qajson_check.info.id == check_id):
+                    qajson_check.outputs = check.get_outputs()
 
         # MBESGC runs all checks over each tile of an input file, therefore
         # it's only possible to update the qajson once all checks have been

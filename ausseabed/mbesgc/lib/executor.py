@@ -2,7 +2,7 @@
 Manages process of executing checks
 '''
 
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, List, Any, Tuple
 from osgeo import gdal
 import numpy as np
 import numpy.ma as ma
@@ -29,7 +29,7 @@ class Executor:
 
         # used to store the results of each check as the checks are run
         # across multiple tiles
-        self.check_result_cache = {}
+        self.check_result_cache: Dict[Tuple[InputFileDetails, str], GridCheck] = {}
 
         self.spatial_export = False
         self.spatial_export_location = None

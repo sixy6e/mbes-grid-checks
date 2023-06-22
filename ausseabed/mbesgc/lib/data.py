@@ -48,7 +48,7 @@ class InputFileDetails:
 
         # keep track of the qajson check entry so that results can be written
         # to it.
-        self.qajson_check = None
+        self.qajson_checks: List[QajsonCheck] = []
 
         # keep track of the original InputFileDetails object
         # this is set for all clones
@@ -65,6 +65,20 @@ class InputFileDetails:
     @property
     def band_count(self):
         return len(self.input_band_details)
+
+    def has_same_inputs(self, other: 'InputFileDetails') -> bool:
+        ''' compares this InputFileDetails against another InputFileDetails to
+        see if they have the same set of input files/bands/band types. Details do
+        not need to be in order.
+        '''
+        for o_input_file, o_band_index, o_band_type in self.input_band_details:
+            found = False
+            for i_input_file, i_band_index, i_band_type in other.input_band_details:
+                if i_input_file == o_input_file and i_band_index == o_band_index and i_band_type == o_band_type:
+                    found = True
+            if not found:
+                return False
+        return True
 
     def clear_band_details(self):
         self.input_band_details.clear()
@@ -140,7 +154,7 @@ class InputFileDetails:
         ifd.projection = self.projection
         ifd.pink_chart_filename = self.pink_chart_filename
         ifd.check_ids_and_params = self.check_ids_and_params
-        ifd.qajson_check = self.qajson_check
+        ifd.qajson_checks = list(self.qajson_checks)
         # only thing we don't clone
         ifd.input_band_details = []
 
@@ -317,11 +331,6 @@ def get_input_details(
         bagdetails = _get_bag_details(inputfiles[0])
         inputdetails.append(bagdetails)
 
-    # maintain reference to the qajson entity this lot of input files was
-    # generated from so we can update the qajson after check is complete.
-    for inputdetail in inputdetails:
-        inputdetail.qajson_check = qajson_check
-
     return inputdetails
 
 
@@ -329,7 +338,7 @@ def inputs_from_qajson_checks(
         qajson_checks: List[QajsonCheck],
         relative_to: str = None) -> List[InputFileDetails]:
 
-    inputs = []
+    inputs: List[InputFileDetails] = []
     for qajson_check in qajson_checks:
         check_id = qajson_check.info.id
         grid_filenames = [
@@ -345,14 +354,28 @@ def inputs_from_qajson_checks(
             if qajson_file.file_type == "Coverage Area"
         ]
 
+        # loop through all the new sets of InputFileDetails that have been identified
         for ci in check_inputs:
             cid_and_params = (check_id, qajson_check.inputs.params)
-            ci.check_ids_and_params.append(cid_and_params)
 
-            if len(pc_filenames) > 0:
-                ci.pink_chart_filename = pc_filenames[0]
+            added = False
+            # now loop through all the existing InputFileDetails
+            for existing_ifd in inputs:
+                if existing_ifd.has_same_inputs(ci):
+                    # then we've already identified this as a set of input data that
+                    # needs to be processed, so instead of duplicating it in the list
+                    # (that would result in it being re-read) we just add another check
+                    # and set of input params to it
+                    existing_ifd.check_ids_and_params.append(cid_and_params)
+                    existing_ifd.qajson_checks.append(qajson_check)
+                    added = True
+            if not added:
+                ci.check_ids_and_params.append(cid_and_params)
+                ci.qajson_checks.append(qajson_check)
+                if len(pc_filenames) > 0:
+                    ci.pink_chart_filename = pc_filenames[0]
+                inputs.append(ci)
 
-        inputs.extend(check_inputs)
     return inputs
 
 
