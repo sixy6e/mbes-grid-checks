@@ -634,7 +634,7 @@ class TvuCheck(GridCheck):
         )
         data = {}
 
-        if self.execution_status != "aborted":
+        if self.execution_status == "completed":
             data = {
                 "failed_cell_count": self.failed_cell_count,
                 "total_cell_count": self.total_cell_count,
@@ -985,7 +985,7 @@ class ResolutionCheck(GridCheck):
         )
 
         data = {}
-        if self.execution_status != "aborted":
+        if self.execution_status == "completed":
             data = {
                 "failed_cell_count": self.failed_cell_count,
                 "total_cell_count": self.total_cell_count,
