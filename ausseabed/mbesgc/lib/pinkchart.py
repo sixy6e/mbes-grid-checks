@@ -227,6 +227,10 @@ class PinkChartProcessor():
         res_y = abs(data_raster_gt[5])
 
         # get the current extents of the pinkchart vector
+        # NOTE: It has been observed that sometimes the extents of a shapefile don't necessarily
+        # match that of the features within the shapefile. One shapefile presented significantly
+        # larger extents than any feature it contained, as such more processing (and memory) was
+        # used than really required.
         pc_vector: ogr.DataSource = ogr.Open(str(self.pinkchart_file.absolute()))
         pc_layer: ogr.Layer = pc_vector.GetLayer()
         pc_layer_extent_values = pc_layer.GetExtent(force=1)
