@@ -4,6 +4,7 @@ Manages process of executing checks
 
 from typing import Optional, Dict, List, Any, Tuple
 from osgeo import gdal
+import logging
 import numpy as np
 import numpy.ma as ma
 import os
@@ -213,15 +214,22 @@ class Executor:
             check.spatial_qajson = self.spatial_qajson
 
             check.check_started()
-            check.run(
-                ifd,
-                tile,
-                depth_data,
-                density_data,
-                uncertainty_data,
-                pinkchart_data
-            )
-            check.check_ended()
+            try:
+                check.run(
+                    ifd,
+                    tile,
+                    depth_data,
+                    density_data,
+                    uncertainty_data,
+                    pinkchart_data
+                )
+                check.check_ended()
+            except Exception as e:
+                check.execution_status = "failed"
+                check.error_message = str(e)
+
+                logger = logging.getLogger(__name__)
+                logger.error(e, exc_info=True)
 
             # if this check has already been run on a different tile we need
             # to merge the results together. Then when all tiles have been run
