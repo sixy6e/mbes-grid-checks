@@ -184,6 +184,18 @@ class Executor:
         Runs each of the checks assigned to each file (via the
         InputFileDetails) on the loaded data arrays
         '''
+        # total number of check that will be run. Not all of them included in
+        # the ifd.check_ids_and_params list will be run here as the checks
+        # may not be implented by this plugin
+        total_check_count = 0
+        for check_id, check_params in ifd.check_ids_and_params:
+            if get_check(check_id, self.checks) is None:
+                # then the check is not supported by this tool
+                # so skip and move on
+                continue
+            total_check_count +=1
+
+        count = 0
         for check_id, check_params in ifd.check_ids_and_params:
             if is_stopped is not None and is_stopped():
                 return
@@ -227,11 +239,30 @@ class Executor:
                 check.merge_results(last_check)
             self.check_result_cache[(src_ifd, check_id)] = check
 
-    def __update_progress(self, progress_callback, progress):
-        if progress_callback is None:
+            count += 1
+            self.__update_tile_progress(0.2 + count / total_check_count * 0.8)
+
+    def __update_progress(self, progress):
+        """ Calls the progress callback directly. Passing a value of 1.0
+        to this function will set the progress bar to 100%
+        """
+        if self._progress_callback is None:
             return
         else:
-            progress_callback(progress)
+            self._progress_callback(progress)
+
+    def __update_tile_progress(self, progress):
+        """ Recalculates the progress so that it's between the `self._tile_start_progress`
+        and `self._tile_end_progress` values. The `progess` value given to this is assumed
+        to be the progress of processing a single tile. eg; progress of 1.0 means that tile
+        has been completed (not all tiles)
+        """
+        if self._progress_callback is None:
+            return
+        else:
+            delta_prog = self._tile_end_progress - self._tile_start_progress
+            adjusted_prog = delta_prog * progress + self._tile_start_progress
+            self._progress_callback(adjusted_prog)
 
     def run(
         self,
@@ -239,9 +270,13 @@ class Executor:
         qajson_update_callback=None,
         is_stopped=None
     ):
+        self._progress_callback = progress_callback
         # preprocess the data
         # - generate pink chart raster, and clip existing rasters to pink chart
+        self.__update_progress(0)
         self._preprocess()
+
+        self.__update_progress(0.05)
 
         # clear out any previously run checks
         self.check_result_cache = {}
@@ -266,8 +301,13 @@ class Executor:
             file_and_tile = (input_file_detail, tiles)
             files_and_tiles.append(file_and_tile)
 
+        total_file_and_tile_count = 0
+        for (ifd, tiles) in files_and_tiles:
+            for _, tile in enumerate(tiles):
+                total_file_and_tile_count += 1
+        self._tile_start_progress = 0.05
+
         processed_tile_count = 0
-        self.__update_progress(progress_callback, 0)
         # loop over each input file
         for (ifd, tiles) in files_and_tiles:
             # and for each input file loop over the necessary tiles
@@ -275,13 +315,20 @@ class Executor:
             # once, and then run all the checks over the loaded tile
             # before moving onto the next
             for _, tile in enumerate(tiles):
+                # we use this to help calculate progress info in the __update_tile_progress function
+                self._tile_start_progress = 0.05 + processed_tile_count / total_file_and_tile_count * 0.95
+                self._tile_end_progress = 0.05 + (processed_tile_count + 1) / total_file_and_tile_count * 0.95
                 if is_stopped is not None and is_stopped():
                     return
+
+                self.__update_tile_progress(0)
 
                 depth_data, density_data, uncertainty_data, pinkchart_data = self._load_data(
                     ifd,
                     tile
                 )
+
+                self.__update_tile_progress(0.2)
 
                 self._run_checks(
                     ifd,
@@ -293,7 +340,5 @@ class Executor:
                     is_stopped
                 )
                 processed_tile_count += 1
-                self.__update_progress(
-                    progress_callback,
-                    processed_tile_count / total_tile_count
-                )
+
+                self.__update_progress(self._tile_end_progress)
