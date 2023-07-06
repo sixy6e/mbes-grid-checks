@@ -97,16 +97,36 @@ class InputFileDetails:
         else:
             return band_details[0], band_details[1]
 
-    def get_filename(self) -> str:
-        ''' Gets the filename (no extension or full path) of from the band
-        information.
+    def get_common_filename(self) -> str:
+        ''' For multi-band tiffs this will return the name of the file (no
+        extension or full path). For single-band tiffs where there are multiple
+        files this will include the common component of the name shared by all
+        filenames.
         '''
         if len(self.input_band_details) == 0:
+            # no files, shouldn't ever happen
             return None
-        else:
+        elif len(self.input_band_details) == 1:
+            # then only a single file has been specified
             input_file, _, _ = self.input_band_details[0]
             fn = Path(input_file).stem
             return fn
+        else:
+            all_names = [Path(input_file).stem for input_file, _, _ in self.input_band_details]
+            min_length = min([len(name) for name in all_names])
+            end_pos = 0
+            for i in range(min_length):
+                char_from_first = all_names[0][i]
+                if all([char_from_first == test_name[i] for test_name in all_names]):
+                    # then chars are ok, so continue on
+                    end_pos += 1
+                    # pass
+                else:
+                    # then this char is not the same, so we need to break
+                    break
+
+            a_name = all_names[0]
+            return a_name[:end_pos]
 
     def get_extents_feature(self) -> MultiPolygon:
         ''' Gets the extents of this input file based on the geotransform as a geojson feature'''

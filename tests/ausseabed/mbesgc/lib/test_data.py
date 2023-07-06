@@ -135,3 +135,9 @@ class TestData(unittest.TestCase):
 
         self.assertFalse(a.has_same_inputs(c))
 
+    def test_get_common_filename(self):
+        inputs = inputs_from_qajson_checks([self.check_01])
+        self.assertEqual('in2018_c01_cs_CUBE_2m_Rev2', inputs[0].get_common_filename())
+
+        inputs = inputs_from_qajson_checks([self.check_02])
+        self.assertEqual('in2018_c01clip_CombinedSurface_CUBE_2m_Rev2_', inputs[0].get_common_filename())

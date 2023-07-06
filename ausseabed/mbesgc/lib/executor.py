@@ -168,7 +168,7 @@ class Executor:
             check: GridCheck) -> str:
         if self.spatial_export_location is None:
             return None
-        check_path = os.path.join(ifd.get_filename(), check.name)
+        check_path = os.path.join(ifd.get_common_filename(), check.name)
         return os.path.join(self.spatial_export_location, check_path)
 
     def _run_checks(
