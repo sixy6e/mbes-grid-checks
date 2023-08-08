@@ -4,6 +4,7 @@ from ausseabed.mbesgc.lib.data import InputFileDetails
 from ausseabed.mbesgc.lib.tiling import Tile
 
 import collections
+import logging
 import numpy as np
 import numpy.ma as ma
 import scipy.ndimage as ndimage
@@ -13,6 +14,8 @@ from osgeo import gdal, ogr, osr
 from affine import Affine
 
 from .gridcheck import GridCheck, GridCheckState, GridCheckResult
+
+logger = logging.getLogger(__name__)
 
 
 class DensityCheck(GridCheck):
@@ -70,6 +73,7 @@ class DensityCheck(GridCheck):
         # if not mark this check as aborted
         self.missing_density = density is None
         if self.missing_density:
+            logger.info("No density data provided, aborting density check")
             self.execution_status = "aborted"
             self.error_message = "Missing density data"
             self.density_histogram = {}
@@ -425,17 +429,16 @@ class TvuCheck(GridCheck):
         if self.missing_depth and self.missing_uncertainty:
             self.execution_status = "aborted"
             self.error_message = "Missing depth and uncertainty data"
-            # we cant run the check so return
-            return
         elif self.missing_depth:
             self.execution_status = "aborted"
             self.error_message = "Missing depth data"
-            # we cant run the check so return
-            return
         elif self.missing_uncertainty:
             self.execution_status = "aborted"
             self.error_message = "Missing uncertainty data"
-            # we cant run the check so return
+
+        if self.execution_status == "aborted":
+            # we can't run the check, so return
+            logger.info(f"{self.error_message}, aborting TVU check")
             return
 
         a = self._depth_error
@@ -779,6 +782,8 @@ class ResolutionCheck(GridCheck):
         if self.missing_depth:
             self.execution_status = "aborted"
             self.error_message = "Missing depth data"
+            logger.info(f"{self.error_message}, aborting resolution check")
+
             # we cant run the check so return
             return
 
