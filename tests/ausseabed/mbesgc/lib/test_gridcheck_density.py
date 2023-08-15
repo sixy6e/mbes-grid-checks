@@ -101,7 +101,6 @@ class TestDensityCheck(unittest.TestCase):
     def test_density_threshold(self):
         input_params = [
             QajsonParam("Minimum Soundings per node", 5),
-            QajsonParam("Minimum Soundings per node at percentage", 5),
             QajsonParam("Minimum Soundings per node percentage", 95),
         ]
 
@@ -134,8 +133,7 @@ class TestDensityCheck(unittest.TestCase):
 
     def test_density_threshold_at_percentage(self):
         input_params = [
-            QajsonParam("Minimum Soundings per node", 0),
-            QajsonParam("Minimum Soundings per node at percentage", 5),
+            QajsonParam("Minimum Soundings per node", 5),
             QajsonParam("Minimum Soundings per node percentage", 89),
         ]
 

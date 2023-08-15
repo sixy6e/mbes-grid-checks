@@ -31,22 +31,17 @@ class DensityCheck(GridCheck):
     version = '1'
     input_params = [
         QajsonParam("Minimum Soundings per node", 5),
-        QajsonParam("Minimum Soundings per node at percentage", 9),
         QajsonParam("Minimum Soundings per node percentage", 95.0),
     ]
 
     def __init__(self, input_params: List[QajsonParam]):
         super().__init__(input_params)
 
-        # if any node has fewer soundings than this value, it will fail
-        self._min_spn = self.get_param('Minimum Soundings per node')
-
         # if a percentage `_min_spn_p` of all nodes is above a threshold
-        # `_min_spn_ap` then this check will also fail
+        # `_min_spn` then this check will fail
+        self._min_spn = self.get_param('Minimum Soundings per node')
         self._min_spn_p = self.get_param(
             'Minimum Soundings per node percentage')
-        self._min_spn_ap = self.get_param(
-            'Minimum Soundings per node at percentage')
 
         self.tiles_geojson = MultiPolygon()
         self.extents_geojson = MultiPolygon()
@@ -295,22 +290,10 @@ class DensityCheck(GridCheck):
 
         lowest_sounding_count, occurrences = next(iter(counts.items()))
 
-        under_absolute_threshold_count = 0
-        if lowest_sounding_count < self._min_spn:
-            for sounding_count, occurrences in iter(counts.items()):
-                if sounding_count >= self._min_spn:
-                    break
-                under_absolute_threshold_count += occurrences
-            messages.append(
-                f'{under_absolute_threshold_count} nodes were found to be under the Minimum Soundings per '
-                f'node setting ({self._min_spn})'
-            )
-            check_state = GridCheckState.cs_fail
-
         total_soundings = sum(counts.values())
         under_threshold_soundings = 0
         for sounding_count, occurrences in counts.items():
-            if sounding_count >= self._min_spn_ap:
+            if sounding_count >= self._min_spn:
                 break
             under_threshold_soundings += occurrences
 
@@ -320,7 +303,7 @@ class DensityCheck(GridCheck):
         if percentage_over_threshold < self._min_spn_p:
             messages.append(
                 f'{percentage_over_threshold:.1f}% of nodes were found to have a '
-                f'sounding count above {self._min_spn_ap}. This is required to'
+                f'sounding count above {self._min_spn}. This is required to'
                 f' be {self._min_spn_p}% of all nodes'
             )
             check_state = GridCheckState.cs_fail
@@ -343,7 +326,6 @@ class DensityCheck(GridCheck):
 
         data['summary'] = {
             'total_soundings': total_soundings,
-            'under_absolute_threshold_count': under_absolute_threshold_count,
             'percentage_over_threshold': percentage_over_threshold,
             'under_threshold_soundings': under_threshold_soundings
         }
