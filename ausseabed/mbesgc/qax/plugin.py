@@ -294,7 +294,7 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
             if density_check:
                 density_data = density_check.outputs.data
                 summary_data = density_data["summary"]
-                return summary_data["under_absolute_threshold_count"]
+                return summary_data["under_threshold_soundings"]
             else:
                 return "No density check"
         elif field_section == 'DENSITY' and field_name.startswith(r"% of nodes with"):
