@@ -226,9 +226,6 @@ def _get_tiff_details(input_files):
         if file_added:
             # already added, so skip this
             pass
-        elif (ifd.band_count == raster.RasterCount or ifd.band_count == 3):
-            # then we were able to identify all available bands based on the names
-            pass
         elif raster.RasterCount == 1 and 'depth' in name_only:
             # then the band type is assumed by the filename
             ifd.add_band_details(input_file, 1, BandType.depth)
