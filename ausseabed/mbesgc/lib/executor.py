@@ -133,6 +133,10 @@ class Executor:
         nodata = src_band.GetNoDataValue()
         if nodata is None:
             return band_data
+        elif np.isnan(nodata):
+            # we need a special case for when NaN is used as nodata because NaN != NaN
+            masked_band_data = ma.masked_where(np.isnan(band_data), band_data)
+            return masked_band_data
         else:
             masked_band_data = ma.masked_where(band_data == nodata, band_data)
             return masked_band_data
