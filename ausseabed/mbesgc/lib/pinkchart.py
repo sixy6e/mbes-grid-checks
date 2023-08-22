@@ -243,9 +243,16 @@ class PinkChartProcessor():
         ogr_srs_raster.ImportFromWkt(data_raster_proj)
 
         ogr_srs_pc = pc_layer.GetSpatialRef()
-        transform = osr.CoordinateTransformation(ogr_srs_pc, ogr_srs_raster)
-        pc_layer_min_x_trans, pc_layer_min_y_trans, _  = transform.TransformPoint(pc_layer_min_x, pc_layer_min_y)
-        pc_layer_max_x_trans, pc_layer_max_y_trans, _  = transform.TransformPoint(pc_layer_max_x, pc_layer_max_y)
+
+        if str(ogr_srs_pc) == str(ogr_srs_raster):
+            # then don't do a coordinate transform as it is in the same CRS and this has some
+            # undesired side effects
+            pc_layer_min_x_trans, pc_layer_min_y_trans  = (pc_layer_min_x, pc_layer_min_y)
+            pc_layer_max_x_trans, pc_layer_max_y_trans = (pc_layer_max_x, pc_layer_max_y)
+        else:
+            transform = osr.CoordinateTransformation(ogr_srs_pc, ogr_srs_raster)
+            pc_layer_min_x_trans, pc_layer_min_y_trans, _  = transform.TransformPoint(pc_layer_min_x, pc_layer_min_y)
+            pc_layer_max_x_trans, pc_layer_max_y_trans, _  = transform.TransformPoint(pc_layer_max_x, pc_layer_max_y)
 
         pc_layer_extents = Extents(pc_layer_min_x_trans, pc_layer_min_y_trans, pc_layer_max_x_trans, pc_layer_max_y_trans)
 
