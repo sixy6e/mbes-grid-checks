@@ -275,6 +275,10 @@ class PinkChartProcessor():
         pc_raster.FlushCache()
         del pc_raster
 
+        pc_ds: gdal.Dataset = gdal.Open(str(self.rasterised_file.absolute()))
+        # we create this raster above, so it's always band 1
+        pc_band: gdal.Band = pc_ds.GetRasterBand(1)
+
         # now warp each of the source rasters into the ideal extents of the
         # pink chart
         for index, src_filename in enumerate(self.raster_files):
@@ -291,4 +295,92 @@ class PinkChartProcessor():
                 cutline_layer_name=pc_layer.GetName()
             )
 
+            # warp the source data into a dataset with the same extents as the
+            # pink chart. While it has the same extents of the pink chart, it
+            # isn't clipped to the pink chart at this stage.
+            fn, ext = os.path.splitext(dest_filename)
+            warped_filename = f"{fn}.warp{ext}"
+            self._warp(
+                data_raster,
+                warped_filename,
+                tapped_extents,
+                res_x,
+                res_y
+            )
+
+            ds_source: gdal.Dataset = gdal.Open(warped_filename)
+            ds_source_datatype = ds_source.GetRasterBand(1).DataType
+
+            # create a new dataset that will include a clipped version of the input
+            # data
+            ds_output: gdal.Dataset = gdal.GetDriverByName('GTiff').Create(
+                str(dest_filename.absolute()),
+                ds_source.RasterXSize,
+                ds_source.RasterYSize,
+                ds_source.RasterCount,
+                ds_source_datatype,
+                options=["COMPRESS=DEFLATE"]
+            )
+            ds_output.SetProjection(pc_ds.GetProjection())
+            ds_output.SetGeoTransform(pc_ds.GetGeoTransform())
+
+            # we're going to process this data on a block by block basis, as this is
+            # a nice compromise between being fast and not loading the entire dataset
+            # into memory
+            size_x = ds_source.RasterXSize
+            size_y = ds_source.RasterYSize
+            tile_size_x, tile_size_y = ds_source.GetRasterBand(1).GetBlockSize()
+            tiles = get_tiles(
+                0,
+                0,
+                size_x,
+                size_y,
+                tile_size_x,
+                tile_size_y
+            )
+
+            # copy description and nodata value to each output band
+            for band_index in range(1, ds_source.RasterCount+1):
+                band_source: gdal.Band = ds_source.GetRasterBand(band_index)
+                band_output: gdal.Band = ds_output.GetRasterBand(band_index)
+                band_output.SetNoDataValue(band_source.GetNoDataValue())
+                band_output.SetDescription(band_source.GetDescription())
+
+            # now loop through each on of the tiles (geotiff blocks)
+            for i, tile in enumerate(tiles):
+                # read the pink chart (coverage area) data for this tile
+                # we only need to read this once for all the bands
+                pc_data = np.array(pc_band.ReadAsArray(
+                    tile.min_x,
+                    tile.min_y,
+                    tile.max_x - tile.min_x,
+                    tile.max_y - tile.min_y
+                ))
+
+                # loop through each one of the bands in the source dataset
+                for band_index in range(1, ds_source.RasterCount+1):
+                    # load the input data
+                    band_source: gdal.Band = ds_source.GetRasterBand(band_index)
+                    band_source_data = np.array(band_source.ReadAsArray(
+                        tile.min_x,
+                        tile.min_y,
+                        tile.max_x - tile.min_x,
+                        tile.max_y - tile.min_y
+                    ))
+                    
+                    # this is where the data is clipped to the pink chart (coverage
+                    # area) dataset. Basically we just replace all the indexes in the
+                    # band_source_data array where the pink chart is 0 with nodata
+                    # and leave the rest of the source data unchanged.
+                    band_source_data[pc_data == 0] = band_source.GetNoDataValue()
+
+                    # now write the modified source data back to the output file
+                    band_output: gdal.Band = ds_output.GetRasterBand(band_index)
+                    band_output.WriteRaster(
+                        tile.min_x, tile.min_y,
+                        tile.width, tile.height,
+                        band_source_data.tobytes(),
+                        tile.width, tile.height,
+                        ds_source_datatype
+                    )
 
