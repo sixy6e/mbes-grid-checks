@@ -17,6 +17,10 @@ from .tiling import get_tiles, Tile
 from .gridcheck import GridCheck
 from .pinkchart import PinkChartProcessor
 
+
+logger = logging.getLogger(__name__)
+
+
 class Executor:
 
     def __init__(
@@ -282,6 +286,8 @@ class Executor:
         qajson_update_callback=None,
         is_stopped=None
     ):
+        logger.info(f"Processing with tile size {self.tile_size_x},{self.tile_size_y}")
+
         self._progress_callback = progress_callback
         # preprocess the data
         # - generate pink chart raster, and clip existing rasters to pink chart
