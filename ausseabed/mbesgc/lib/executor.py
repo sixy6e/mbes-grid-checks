@@ -56,7 +56,7 @@ class Executor:
         will recreate all input files to match up with the pink chart, and
         also generate a raster version of the pink chart.
         '''
-        
+
         self.source_input_file_details = list(self.input_file_details)
 
         # iterate by index as we'll be replacing ifds as we iterate over this list
@@ -83,15 +83,20 @@ class Executor:
             self.temp_dirs.append(temp_dir)
             temp_dir_path = Path(temp_dir)
 
-
             raster_inputs = []
             raster_outputs = []
             pc_output = temp_dir_path.joinpath(Path(ifd.pink_chart_filename).stem + "_pinkchart.tif")
 
             for input_file, band_index, band_type in ifd.input_band_details:
-                raster_inputs.append(Path(input_file))
                 output_file = temp_dir_path.joinpath(Path(input_file).stem + ".tif")
-                raster_outputs.append(output_file)
+                # The pink chart processor processes whole geotiffs including all the bands
+                # to make sure we don't unecessarily process the same input raster multiple
+                # times (as would be the case with a multi band geotiff), we filter out duplicates
+                # here.
+                # Also, while reprocessing duplicates worked on MacOS it failed on Windows
+                if Path(input_file) not in raster_inputs:
+                    raster_inputs.append(Path(input_file))
+                    raster_outputs.append(output_file)
 
                 processed_ifd.add_band_details(str(output_file), band_index, band_type)
 
