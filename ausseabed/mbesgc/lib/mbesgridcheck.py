@@ -426,6 +426,11 @@ class TvuCheck(GridCheck):
         a = self._depth_error
         b = self._depth_error_factor
 
+        # some tools produce negative uncertainty values which will cause
+        # problems with the threshold check. So calculate the abs values
+        # and use this to check against.
+        uncertainty = np.absolute(uncertainty)
+
         # count of all cells/nodes/pixels that are not NaN in the uncertainty
         # array
         self.total_cell_count = int(uncertainty.count())

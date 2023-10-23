@@ -93,3 +93,40 @@ class TestDensityCheck(unittest.TestCase):
         # [0.29732138 0.29732138 0.29732138 0.29732138]
         # and these values exceed the actual uncertainty data in 5 locations
         self.assertEqual(check.failed_cell_count, 5)
+
+    def test_tvu_negative_uncertainty(self):
+        # test that datasest that are produced with a negative uncertainty value
+        # are correctly supported. Some bathy tools are known to produce negative
+        # uncertaintys that mess with the threshold check.
+        #
+        # This check is a copy of the above, with the uncertainty values made
+        # negative.
+        #
+        input_params = [
+            QajsonParam("Constant Depth Error", 0.1),
+            QajsonParam("Factor of Depth Dependent Errors", 0.007)
+        ]
+
+        neg_uncertainty = self.uncertainty * -1.0
+
+        check = TvuCheck(input_params)
+        check.run(
+            ifd=self.dummy_ifd,
+            tile=self.dummy_tile,
+            depth=self.depth,
+            density=self.density,
+            uncertainty=neg_uncertainty,
+            pinkchart=None
+        )
+
+        # 17 because three of the cells are masked
+        self.assertEqual(check.total_cell_count, 17)
+
+        # calculated uncertainty works out to be the following array
+        # [0.29732138 0.29732138 0.29732138 0.29732138]
+        # [0.29732138 0.4317407  0.5688585  0.29732138]
+        # [0.29732138 0.4317407  0.5001     0.29732138]
+        # [0.29732138 0.23259409 0.5001     0.29732138]
+        # [0.29732138 0.29732138 0.29732138 0.29732138]
+        # and these values exceed the actual uncertainty data in 5 locations
+        self.assertEqual(check.failed_cell_count, 5)
