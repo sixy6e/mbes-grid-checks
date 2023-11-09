@@ -345,8 +345,12 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
         self.exe.spatial_qajson = self.spatial_outputs_qajson
         self.exe.spatial_export = self.spatial_outputs_export
         self.exe.spatial_export_location = self.spatial_outputs_export_location
-        self.exe.tile_size_x = self.gridprocessing_tile_x
-        self.exe.tile_size_y = self.gridprocessing_tile_y
+
+        if self.gridprocessing_tile_x is not None and self.gridprocessing_tile_y is not None:
+            # the executor defines a default tile size, don't overide this if the
+            # gridprocessing_tile_x or gridprocessing_tile_y haven't been set
+            self.exe.tile_size_x = self.gridprocessing_tile_x
+            self.exe.tile_size_y = self.gridprocessing_tile_y
 
         # the check_runner callback accepts only a float, whereas the qax
         # qwax plugin check tool callback requires a referece to a check tool
