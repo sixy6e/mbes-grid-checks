@@ -69,7 +69,8 @@ class TestDensityCheck(unittest.TestCase):
     def test_tvu(self):
         input_params = [
             QajsonParam("Constant Depth Error", 0.1),
-            QajsonParam("Factor of Depth Dependent Errors", 0.007)
+            QajsonParam("Factor of Depth Dependent Errors", 0.007),
+            QajsonParam("Acceptable Area Percentage", 100.0)
         ]
 
         check = TvuCheck(input_params)
@@ -94,6 +95,38 @@ class TestDensityCheck(unittest.TestCase):
         # and these values exceed the actual uncertainty data in 5 locations
         self.assertEqual(check.failed_cell_count, 5)
 
+        outputs = check.get_outputs()
+        # check should fail as there are nodes that do not pass the uncertainty threshold
+        # AND we've specified that 100% of the nodes must pass
+        self.assertEqual(outputs.check_state, 'fail')
+
+    def test_tvu_with_area_threshold(self):
+        # here we're saying 5 of the 17 nodes must have an allowable
+        # uncertainty value for this check to be deemed a pass
+        acceptable_area_percentage = (17.0 - 5.0)/17.0 * 100
+
+        input_params = [
+            QajsonParam("Constant Depth Error", 0.1),
+            QajsonParam("Factor of Depth Dependent Errors", 0.007),
+            QajsonParam("Acceptable Area Percentage", acceptable_area_percentage)
+        ]
+
+        check = TvuCheck(input_params)
+        check.run(
+            ifd=self.dummy_ifd,
+            tile=self.dummy_tile,
+            depth=self.depth,
+            density=self.density,
+            uncertainty=self.uncertainty,
+            pinkchart=None
+        )
+
+        outputs = check.get_outputs()
+        # check should pass. While there are 5 nodes that do not pass the
+        # uncertainty threshold we've specified that only 75% of nodes must
+        # pass the threshold which is the case here
+        self.assertEqual(outputs.check_state, 'pass')
+
     def test_tvu_negative_uncertainty(self):
         # test that datasest that are produced with a negative uncertainty value
         # are correctly supported. Some bathy tools are known to produce negative
@@ -104,7 +137,8 @@ class TestDensityCheck(unittest.TestCase):
         #
         input_params = [
             QajsonParam("Constant Depth Error", 0.1),
-            QajsonParam("Factor of Depth Dependent Errors", 0.007)
+            QajsonParam("Factor of Depth Dependent Errors", 0.007),
+            QajsonParam("Acceptable Area Percentage", 100.0)
         ]
 
         neg_uncertainty = self.uncertainty * -1.0

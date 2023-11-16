@@ -356,7 +356,8 @@ class TvuCheck(GridCheck):
     version = '1'
     input_params = [
         QajsonParam("Constant Depth Error", 0.5),
-        QajsonParam("Factor of Depth Dependent Errors", 0.013)
+        QajsonParam("Factor of Depth Dependent Errors", 0.013),
+        QajsonParam("Acceptable Area Percentage", 100.0)
     ]
 
     def __init__(self, input_params: List[QajsonParam]):
@@ -365,6 +366,8 @@ class TvuCheck(GridCheck):
         self._depth_error = self.get_param('Constant Depth Error')
         self._depth_error_factor = self.get_param(
             'Factor of Depth Dependent Errors')
+        self._area_percentage = self.get_param(
+            'Acceptable Area Percentage')
 
         self.tiles_geojson = MultiPolygon()
         self.extents_geojson = MultiPolygon()
@@ -624,6 +627,10 @@ class TvuCheck(GridCheck):
         )
         data = {}
 
+        percent_failed = (
+            self.failed_cell_count / self.total_cell_count * 100.0
+        )
+
         if self.execution_status == "completed":
             data = {
                 "failed_cell_count": self.failed_cell_count,
@@ -645,13 +652,12 @@ class TvuCheck(GridCheck):
                 data=data,
                 check_state=GridCheckState.cs_fail
             )
-        elif self.failed_cell_count > 0:
-            percent_failed = (
-                self.failed_cell_count / self.total_cell_count * 100
-            )
+        elif (100.0 - percent_failed) < self._area_percentage:
             msg = (
                 f"{self.failed_cell_count} nodes failed the TVU check this "
                 f"represents {percent_failed:.1f}% of all nodes within data."
+                f"The area based percentage of nodes that passed the allowable "
+                f"TVU did not exceed the Acceptable Area Percentage specified ({self._area_percentage:.1f}%)"
             )
             return QajsonOutputs(
                 execution=execution,
