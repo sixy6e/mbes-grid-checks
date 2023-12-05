@@ -627,10 +627,6 @@ class TvuCheck(GridCheck):
         )
         data = {}
 
-        percent_failed = (
-            self.failed_cell_count / self.total_cell_count * 100.0
-        )
-
         if self.execution_status == "completed":
             data = {
                 "failed_cell_count": self.failed_cell_count,
@@ -652,7 +648,11 @@ class TvuCheck(GridCheck):
                 data=data,
                 check_state=GridCheckState.cs_fail
             )
-        elif (100.0 - percent_failed) < self._area_percentage:
+
+        percent_failed = (
+            self.failed_cell_count / self.total_cell_count * 100.0
+        )
+        if (100.0 - percent_failed) < self._area_percentage:
             msg = (
                 f"{self.failed_cell_count} nodes failed the TVU check this "
                 f"represents {percent_failed:.1f}% of all nodes within data."
