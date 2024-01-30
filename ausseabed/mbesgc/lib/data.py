@@ -126,7 +126,13 @@ class InputFileDetails:
                     break
 
             a_name = all_names[0]
-            return a_name[:end_pos]
+            if end_pos < 5:
+                # then there was insufficient common characters at the start of the file names
+                # so just use the first filename
+                # the 5 characters in this case was chosen arbitrarily
+                return all_names[0]
+            else:
+                return a_name[:end_pos]
 
     def get_extents_feature(self) -> MultiPolygon:
         ''' Gets the extents of this input file based on the geotransform as a geojson feature'''
