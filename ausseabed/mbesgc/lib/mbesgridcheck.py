@@ -185,7 +185,7 @@ class DensityCheck(GridCheck):
                 transformed.Transform(transform)
 
                 geojson_feature = geojson.loads(feature.ExportToJson())
-                self.tiles_geojson.coordinates.extend(
+                self.tiles_geojson.coordinates.append(
                     geojson_feature.geometry.coordinates
                 )
 
@@ -551,7 +551,7 @@ class TvuCheck(GridCheck):
 
                 geojson_feature = geojson.loads(feature.ExportToJson())
 
-                self.tiles_geojson.coordinates.extend(
+                self.tiles_geojson.coordinates.append(
                     geojson_feature.geometry.coordinates
                 )
 
@@ -904,7 +904,7 @@ class ResolutionCheck(GridCheck):
 
                 geojson_feature = geojson.loads(feature.ExportToJson())
 
-                self.tiles_geojson.coordinates.extend(
+                self.tiles_geojson.coordinates.append(
                     geojson_feature.geometry.coordinates
                 )
 

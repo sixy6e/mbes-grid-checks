@@ -150,12 +150,12 @@ class InputFileDetails:
         transformed_bounds = transform.TransformBounds(minx, miny, maxx, maxy, 2)
         minx, miny, maxx, maxy = transformed_bounds
 
-        polygon = MultiPolygon([[
+        polygon = MultiPolygon([[[
             (miny, minx),
             (miny, maxx),
             (maxy, maxx),
             (maxy, minx),
-        ]])
+        ]]])
 
         return polygon
 
