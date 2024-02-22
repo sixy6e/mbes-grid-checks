@@ -260,6 +260,19 @@ class DensityCheck(GridCheck):
 
     def get_outputs(self) -> QajsonOutputs:
 
+        if len(self.density_histogram) == 0:
+            # then there's been nothing but nodata for all tiles
+            # posisbly caused by pink chart (coverage) not overlapping
+            # raster data.
+            self.execution_status = "failed"
+            msg = (
+                "Density check did not find any non-nodata data in inputs. "
+                "This could be a result of a coverage area file not intersecting "
+                "grid data."
+            )
+            logger.error(msg)
+            self.error_message = msg
+
         execution = QajsonExecution(
             start=self.start_time,
             end=self.end_time,
@@ -267,16 +280,14 @@ class DensityCheck(GridCheck):
             error=self.error_message
         )
 
-        if len(self.density_histogram) == 0:
-            # there's no data to check, so fail
+        if self.execution_status == "aborted" or self.execution_status == "failed":
             return QajsonOutputs(
                 execution=execution,
                 files=None,
                 count=None,
                 percentage=None,
-                messages=[
-                    'No counts were extracted, was a valid raster provided'],
-                data=None,
+                messages=[self.error_message],
+                data={},
                 check_state=GridCheckState.cs_fail
             )
 
@@ -619,6 +630,19 @@ class TvuCheck(GridCheck):
 
     def get_outputs(self) -> QajsonOutputs:
 
+        if self.total_cell_count == 0:
+            # then there's been nothing but nodata for all tiles
+            # posisbly caused by pink chart (coverage) not overlapping
+            # raster data.
+            self.execution_status = "failed"
+            msg = (
+                "TVU check did not find any non-nodata data in inputs. "
+                "This could be a result of a coverage area file not intersecting "
+                "grid data."
+            )
+            logger.error(msg)
+            self.error_message = msg
+
         execution = QajsonExecution(
             start=self.start_time,
             end=self.end_time,
@@ -638,7 +662,7 @@ class TvuCheck(GridCheck):
                 data['map'] = self.tiles_geojson
                 data['extents'] = self.extents_geojson
 
-        if self.execution_status == "aborted":
+        if self.execution_status == "aborted" or self.execution_status == "failed":
             return QajsonOutputs(
                 execution=execution,
                 files=None,
@@ -975,6 +999,19 @@ class ResolutionCheck(GridCheck):
 
     def get_outputs(self) -> QajsonOutputs:
 
+        if self.total_cell_count == 0:
+            # then there's been nothing but nodata for all tiles
+            # posisbly caused by pink chart (coverage) not overlapping
+            # raster data.
+            self.execution_status = "failed"
+            msg = (
+                "Resolution check did not find any non-nodata data in inputs. "
+                "This could be a result of a coverage area file not intersecting "
+                "grid data."
+            )
+            logger.error(msg)
+            self.error_message = msg
+
         execution = QajsonExecution(
             start=self.start_time,
             end=self.end_time,
@@ -995,7 +1032,7 @@ class ResolutionCheck(GridCheck):
                 data['map'] = self.tiles_geojson
                 data['extents'] = self.extents_geojson
 
-        if self.execution_status == "aborted":
+        if self.execution_status == "aborted" or self.execution_status == "failed":
             return QajsonOutputs(
                 execution=execution,
                 files=None,
