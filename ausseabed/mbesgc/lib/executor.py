@@ -12,7 +12,7 @@ import tempfile
 from pathlib import Path
 
 from .check_utils import get_check
-from .data import InputFileDetails, BandType
+from .data import InputFileDetails, BandType, InputFileDetailsError
 from .tiling import get_tiles, Tile
 from .gridcheck import GridCheck
 from .pinkchart import PinkChartProcessor
@@ -297,6 +297,17 @@ class Executor:
         # preprocess the data
         # - generate pink chart raster, and clip existing rasters to pink chart
         self.__update_progress(0)
+        validation_failed = False
+        for input_file_detail in self.input_file_details:
+            passed, messages = input_file_detail.validate()
+            if not passed:
+                validation_failed = True
+                for msg in messages:
+                    logger.error(msg)
+        if validation_failed:
+            raise InputFileDetailsError("Error occured during validation, check logs")
+
+        self.__update_progress(0.025)
         self._preprocess()
 
         self.__update_progress(0.05)

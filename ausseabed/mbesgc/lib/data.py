@@ -7,7 +7,7 @@ to what they represent
 from enum import Enum
 from osgeo import gdal, osr
 from geojson import MultiPolygon
-from typing import Tuple, List, Type
+from typing import Tuple, List, Type, Dict
 import os
 import os.path
 from pathlib import Path
@@ -27,6 +27,11 @@ class BandType(str, Enum):
     pinkChart = 'pinkChart'
 
 
+class InputFileDetailsError(RuntimeError):
+    ''' Error raised when issues are identified with InputFileDetails'''
+    pass
+
+
 class InputFileDetails:
 
     def __init__(self):
@@ -38,7 +43,7 @@ class InputFileDetails:
         self.geotransform = None
         self.projection = None
 
-        self.input_band_details = []
+        self.input_band_details: Tuple[str, int, BandType] = []
 
         # pink chart filename, if one was given
         self.pink_chart_filename = None
@@ -96,6 +101,41 @@ class InputFileDetails:
             return None, None
         else:
             return band_details[0], band_details[1]
+
+    def validate(self) -> Tuple[bool, List[str]]:
+        ''' Run a series of checks on this input to identify any issues that
+        would require the user to modify input data.
+        Returns a boolean indicating if validation was passed and a list of
+        messages identifying the validation issues.
+        '''
+        validation_messages: List[str] =  []
+        # there should be at max 3 input bands (depth, density, uncertainty)
+        if len(self.input_band_details) > 3:
+            validation_messages.append(
+                f"A maximum of 3 input bands is expected, "
+                f"but {len(self.input_band_details)} were provided."
+            )
+
+        # there should be no duplication in input bands
+        # build up a dict that includes a count of each band type
+        bandtypes_and_count: Dict[BandType, int] = {}
+        for (_, _, band_type) in self.input_band_details:
+            if band_type in bandtypes_and_count:
+                bandtypes_and_count[band_type] = bandtypes_and_count[band_type] + 1
+            else:
+                bandtypes_and_count[band_type] = 1
+
+        # now raise errors as appropriate
+        dup_msg: List[str] = []
+        for (band_type, count) in bandtypes_and_count.items():
+            if count > 1:
+                dup_msg.append(f"{count} bands were found with type {band_type}")
+        msg = f"Found more than 1 band defined with the same data type ({', '.join(dup_msg)})"
+        if len(dup_msg) >= 1:
+            validation_messages.append(msg)
+
+        # if there are no validation messages, then assume validation is ok
+        return len(validation_messages) == 0, validation_messages
 
     def get_common_filename(self) -> str:
         ''' For multi-band tiffs this will return the name of the file (no

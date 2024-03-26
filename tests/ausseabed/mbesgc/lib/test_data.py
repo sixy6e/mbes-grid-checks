@@ -141,3 +141,32 @@ class TestData(unittest.TestCase):
 
         inputs = inputs_from_qajson_checks([self.check_02])
         self.assertEqual('in2018_c01clip_CombinedSurface_CUBE_2m_Rev2_', inputs[0].get_common_filename())
+
+    def test_validate_duplicate_input_bands(self):
+        a = InputFileDetails()
+        a.add_band_details('f1', 1, BandType.depth)
+        a.add_band_details('f1', 2, BandType.depth)
+        a.add_band_details('f1', 3, BandType.uncertainty)
+
+        passed, _ = a.validate()
+        self.assertFalse(passed)
+
+    def test_validate_more_than_3_inputs(self):
+        a = InputFileDetails()
+        a.add_band_details('f1', 1, BandType.depth)
+        a.add_band_details('f1', 2, BandType.density)
+        a.add_band_details('f1', 3, BandType.uncertainty)
+        a.add_band_details('f1', 3, "blah")
+
+        passed, _ = a.validate()
+        self.assertFalse(passed)
+
+    def test_validate_ok(self):
+        a = InputFileDetails()
+        a.add_band_details('f1', 1, BandType.depth)
+        a.add_band_details('f1', 2, BandType.density)
+        a.add_band_details('f1', 3, BandType.uncertainty)
+
+        passed, messages = a.validate()
+        self.assertTrue(passed)
+        self.assertEqual(len(messages), 0)
