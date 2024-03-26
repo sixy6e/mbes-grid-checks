@@ -8,11 +8,8 @@ Assumes a miniconda Python distribution has been installed.
     git clone https://github.com/ausseabed/mbes-grid-checks
     cd mbes-grid-checks
 
-    conda create -y -n mbesgc python=3.7
+    conda env create --file conda.yml
     conda activate mbesgc
-
-    pip install -r requirements.txt
-    conda install -y -c conda-forge --file requirements_conda.txt
 
     pip install .
 
@@ -36,4 +33,4 @@ Command line usage can be displayed using the `--help` command line arguement. e
 
 Unit tests can be run with the following command line
 
-    python -m pytest -s --cov=ausseabed.mbesgc tests/
+    python -m pytest -s --cov=ausseabed.mbesgc tests/ausseabed/mbesgc/lib

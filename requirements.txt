@@ -1,9 +1,0 @@
-coveralls
-jsonschema
-geojson==2.5.0
-affine==2.3.0
-pytest
-pytest-cov
-git+git://github.com/ausseabed/qajson.git@master#egg=ausseabed.qajson
-
-click==7.1.2
