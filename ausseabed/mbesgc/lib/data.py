@@ -134,6 +134,18 @@ class InputFileDetails:
         if len(dup_msg) >= 1:
             validation_messages.append(msg)
 
+        # check that all input bands have nodata values and that all bands have
+        # the same size
+        for (filename, band_index, band_type) in self.input_band_details:
+            ds = gdal.Open(filename)
+            if ds is None:
+                raise RuntimeError(f"Could not open {filename}")
+
+            band: gdal.Band = ds.GetRasterBand(band_index)
+            if band.GetNoDataValue() is None:
+                msg = f"band index {band_index} in file {filename} has no nodata value assigned" 
+                validation_messages.append(msg)
+
         # if there are no validation messages, then assume validation is ok
         return len(validation_messages) == 0, validation_messages
 
