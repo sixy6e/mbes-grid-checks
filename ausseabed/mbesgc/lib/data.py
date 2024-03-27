@@ -134,8 +134,10 @@ class InputFileDetails:
         if len(dup_msg) >= 1:
             validation_messages.append(msg)
 
-        # check that all input bands have nodata values and that all bands have
-        # the same size
+        # check that all input bands have nodata values, all bands have
+        # the same size and resolution
+        size_x = None
+        size_y = None
         for (filename, band_index, band_type) in self.input_band_details:
             ds = gdal.Open(filename)
             if ds is None:
@@ -144,6 +146,26 @@ class InputFileDetails:
             band: gdal.Band = ds.GetRasterBand(band_index)
             if band.GetNoDataValue() is None:
                 msg = f"band index {band_index} in file {filename} has no nodata value assigned" 
+                validation_messages.append(msg)
+
+            if size_x is None:
+                size_x = ds.RasterXSize
+            elif size_x != ds.RasterXSize:
+                msg = (
+                    f"Input raster bands differ in x size ({size_x} != "
+                    f"{ds.RasterXSize}) and should be the same across all "
+                    "bands in a single dataset"
+                )
+                validation_messages.append(msg)
+
+            if size_y is None:
+                size_y = ds.RasterYSize
+            elif size_y != ds.RasterYSize:
+                msg = (
+                    f"Input raster bands differ in y size ({size_y} != "
+                    f"{ds.RasterYSize}) and should be the same across all "
+                    "bands in a single dataset"
+                )
                 validation_messages.append(msg)
 
         # if there are no validation messages, then assume validation is ok
