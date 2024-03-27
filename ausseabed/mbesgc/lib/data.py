@@ -138,6 +138,9 @@ class InputFileDetails:
         # the same size and resolution
         size_x = None
         size_y = None
+        res_x = None
+        res_y = None
+
         for (filename, band_index, band_type) in self.input_band_details:
             ds = gdal.Open(filename)
             if ds is None:
@@ -147,6 +150,26 @@ class InputFileDetails:
             if band.GetNoDataValue() is None:
                 msg = f"band index {band_index} in file {filename} has no nodata value assigned" 
                 validation_messages.append(msg)
+
+            if res_x is None or res_y is None:
+                _, res_x, _, _, _, res_y  = ds.GetGeoTransform()
+
+            else:
+                _, ds_res_x, _, _, _, ds_res_y  = ds.GetGeoTransform()
+                if ds_res_x != res_x:
+                    msg = (
+                        f"Input raster bands differ in x resolution ({res_x} != "
+                        f"{ds_res_x}) and should be the same across all "
+                        "bands in a single dataset"
+                    )
+                    validation_messages.append(msg)
+                if ds_res_y != res_y:
+                    msg = (
+                        f"Input raster bands differ in y resolution ({res_y} != "
+                        f"{ds_res_y}) and should be the same across all "
+                        "bands in a single dataset"
+                    )
+                    validation_messages.append(msg)
 
             if size_x is None:
                 size_x = ds.RasterXSize
