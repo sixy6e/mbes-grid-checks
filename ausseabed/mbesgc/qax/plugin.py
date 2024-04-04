@@ -66,6 +66,7 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
                 supported_file_types=MbesGridChecksQaxPlugin.file_types,
                 default_input_params=mgc_check_class.input_params,
                 version=mgc_check_class.version,
+                parameter_help_link=mgc_check_class.parameter_help_link,
             )
             check_refs.append(cr)
 

@@ -33,6 +33,7 @@ class DensityCheck(GridCheck):
         QajsonParam("Minimum Soundings per node", 5),
         QajsonParam("Minimum Soundings per node percentage", 95.0),
     ]
+    parameter_help_link='user_manual_qax_MBESGC.html#mbesgc-density-params'
 
     def __init__(self, input_params: List[QajsonParam]):
         super().__init__(input_params)
@@ -370,6 +371,7 @@ class TvuCheck(GridCheck):
         QajsonParam("Factor of Depth Dependent Errors", 0.013),
         QajsonParam("Acceptable Area Percentage", 100.0)
     ]
+    parameter_help_link='user_manual_qax_MBESGC.html#mbesgc-tvu-params'
 
     def __init__(self, input_params: List[QajsonParam]):
         super().__init__(input_params)
@@ -737,6 +739,7 @@ class ResolutionCheck(GridCheck):
         QajsonParam("Below Threshold FDS Depth Multiplier", 0.05),
         QajsonParam("Below Threshold FDS Depth Constant", 0.0)
     ]
+    parameter_help_link='user_manual_qax_MBESGC.html#mbesgc-resolution-params'
 
     def __init__(self, input_params: List[QajsonParam]):
         super().__init__(input_params)
