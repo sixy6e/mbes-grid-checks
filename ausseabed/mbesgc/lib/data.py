@@ -5,7 +5,7 @@ to what they represent
 '''
 
 from enum import Enum
-from osgeo import gdal, osr
+from osgeo import gdal, osr, ogr
 from geojson import MultiPolygon
 from typing import Tuple, List, Type, Dict
 import os
@@ -145,6 +145,17 @@ class InputFileDetails:
             ds = gdal.Open(filename)
             if ds is None:
                 raise RuntimeError(f"Could not open {filename}")
+
+            proj_str = ds.GetProjection()
+            ogr_srs = osr.SpatialReference()
+            try:
+                ogr_srs.ImportFromWkt(proj_str)
+                valid = ogr_srs.Validate()
+                if valid != ogr.OGRERR_NONE:
+                    raise RuntimeError("CRS failed validation")
+            except Exception as e:
+                validation_messages.append(f"{filename} has invalid Coordinate Reference System (CRS) information")
+                validation_messages.append(f'CRS string is "{proj_str}"')
 
             band: gdal.Band = ds.GetRasterBand(band_index)
             if band.GetNoDataValue() is None:
