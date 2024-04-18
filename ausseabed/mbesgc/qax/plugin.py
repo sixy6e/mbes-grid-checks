@@ -3,8 +3,7 @@ from pathlib import Path
 
 
 from ausseabed.mbesgc.lib.allchecks import all_checks
-from ausseabed.mbesgc.lib.data import get_input_details, \
-    inputs_from_qajson_checks, InputFileDetails, _get_tiff_details
+from ausseabed.mbesgc.lib.data import inputs_from_qajson_checks
 from ausseabed.mbesgc.lib.executor import Executor
 
 from hyo2.qax.lib.plugin import QaxCheckToolPlugin, QaxCheckReference, \

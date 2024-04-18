@@ -1,4 +1,5 @@
 from pathlib import Path
+import logging
 import math
 import numpy as np
 import os
@@ -9,6 +10,9 @@ from osgeo import osr
 from typing import List, Tuple
 
 from .tiling import get_tiles, Tile
+
+
+logger = logging.getLogger(__name__)
 
 
 class Extents():

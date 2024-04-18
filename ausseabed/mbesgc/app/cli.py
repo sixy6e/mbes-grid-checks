@@ -47,7 +47,7 @@ def cli(
                 err=True)
             sys.exit(os.EX_NOINPUT)
 
-        inputs = get_input_details(None, [grid_file])
+        inputs = get_input_details([grid_file])
         qajson = qajson_from_inputs(
             input=inputs[0],
             check_classes=all_checks

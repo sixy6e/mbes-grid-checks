@@ -429,7 +429,6 @@ def _get_bag_details(input_file):
 
 
 def get_input_details(
-        qajson_check: QajsonCheck,
         inputfiles: List[str],
         relative_to: str = None) -> List[InputFileDetails]:
     '''
@@ -477,7 +476,7 @@ def inputs_from_qajson_checks(
             for qajson_file in qajson_check.inputs.files
             if qajson_file.file_type == "Survey DTMs"
         ]
-        check_inputs = get_input_details(qajson_check, grid_filenames, relative_to)
+        check_inputs = get_input_details(grid_filenames, relative_to)
 
         pc_filenames = [
             qajson_file.path
