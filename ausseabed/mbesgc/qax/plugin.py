@@ -3,7 +3,7 @@ from pathlib import Path
 
 
 from ausseabed.mbesgc.lib.allchecks import all_checks
-from ausseabed.mbesgc.lib.data import inputs_from_qajson_checks
+from ausseabed.mbesgc.lib.data import inputs_from_qajson_checks, get_input_details
 from ausseabed.mbesgc.lib.executor import Executor
 
 from hyo2.qax.lib.plugin import QaxCheckToolPlugin, QaxCheckReference, \
@@ -336,3 +336,15 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
         #     # by the check_runner
         #     in_check.outputs = out_check.outputs
 
+    def get_file_details(self, filename: str) -> str:
+        """ Return some details about the raster file that's been provided. In this
+        case a list of the bands, and the resolution of the dataset.
+        """
+        ifds = get_input_details([filename])
+        band_types = []
+        for ifd in ifds:
+            for (_, _, band_type) in ifd.input_band_details:
+                band_types.append(band_type)
+            band_types.append(f"{ifd.size_x}{chr(0x00D7)}{ifd.size_y}")
+
+        return "\n".join(band_types)
