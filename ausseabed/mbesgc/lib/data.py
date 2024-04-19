@@ -551,3 +551,21 @@ def qajson_from_inputs(
     root = QajsonRoot(qa)
 
     return root
+
+
+# function is used by the QAX plugin, we have it here as the same code is needed
+# in the finder-grid-check plugin
+def get_file_details(filename: str) -> str:
+    """ Return some details about the raster file that's been provided. In this
+    case a list of the bands, and the resolution of the dataset.
+    """
+    ifds = get_input_details([filename])
+    band_types = []
+    for ifd in ifds:
+        for (_, _, band_type) in ifd.input_band_details:
+            band_types.append(band_type)
+        if len(ifd.input_band_details) == 0:
+            band_types.append("Type not identified")
+        band_types.append(f"{ifd.size_x}{chr(0x00D7)}{ifd.size_y}")
+
+    return "\n".join(band_types)
