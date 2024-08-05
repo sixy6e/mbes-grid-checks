@@ -117,7 +117,7 @@ class Executor:
             # to the input file details
             processed_ifd.add_band_details(str(pc_output), 1, BandType.pinkChart)
 
-    def _load_band_tile(self, filename: str, band_index: int, tile: Tile):
+    def _load_band_tile(self, filename: str, band_index: int, tile: Tile, zeroed_nulls: bool=False):
         # function may be called even when the band was not given as input
         # by the user. In such cases the filename and band index will be
         # None. It's up to the checks later on to handle being given None
@@ -139,15 +139,24 @@ class Executor:
 
         # we need to mask the nodata values otherwise whatever value is used
         # for nodata will appear in the results
+        # zeroed_nulls was included to specifically resolve the issue documented at
+        # https://github.com/ausseabed/finder-grid-checks/issues/2
         nodata = src_band.GetNoDataValue()
         if nodata is None:
+            # TODO; this should return a masked array like the other two cases
             return band_data
         elif np.isnan(nodata):
             # we need a special case for when NaN is used as nodata because NaN != NaN
-            masked_band_data = ma.masked_where(np.isnan(band_data), band_data)
+            mask = np.isnan(band_data)
+            if zeroed_nulls:
+                band_data[mask] = 0
+            masked_band_data = ma.masked_where(mask, band_data)
             return masked_band_data
         else:
-            masked_band_data = ma.masked_where(band_data == nodata, band_data)
+            mask = band_data == nodata
+            if zeroed_nulls:
+                band_data[mask] = 0
+            masked_band_data = ma.masked_where(mask, band_data)
             return masked_band_data
 
     def _load_data(self, ifd: InputFileDetails, tile: Tile):
@@ -163,8 +172,9 @@ class Executor:
 
         depth_data = self._load_band_tile(
             depth_file, depth_band_idx, tile)
+        # makes sense for density to have null data of any value converted to zero
         density_data = self._load_band_tile(
-            density_file, density_band_idx, tile)
+            density_file, density_band_idx, tile, True)
         uncertainty_data = self._load_band_tile(
             uncertainty_file, uncertainty_band_idx, tile)
         pinkchart_data = self._load_band_tile(
