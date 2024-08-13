@@ -250,7 +250,10 @@ class MbesGridChecksQaxPlugin(QaxCheckToolPlugin):
         elif field_section == 'UNCERTAINTY' and field_name == "TVU Check comment":
             return ""
         elif field_section == 'RESOLUTION' and field_name == "Resolution Check QAX Message":
-            return res_check.outputs.check_state
+            if res_check:
+                return res_check.outputs.check_state
+            else:
+                return "No resolution check"
 
         else:
             return "No summary value"
